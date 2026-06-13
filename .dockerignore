@@ -1,3 +1,6 @@
 .git
 .claude
 *.log
+# The build image does not need built RPMs in its context; the test image is
+# built from its own small staging dir (output/rocky<N>/.ctx), not this root.
+output

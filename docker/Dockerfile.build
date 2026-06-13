@@ -1,11 +1,18 @@
 # syntax=docker/dockerfile:1
 #
-# Builds RStudio Server from source on Rocky Linux 10 and produces an RPM.
+# Builds RStudio Server from source on Rocky Linux (8 or 10) and produces an
+# RPM. Select the OS with --build-arg BASE_IMAGE=rockylinux/rockylinux:8
+# (the Makefile does this via `make ... ROCKY=8`).
 #
 # The resulting RPM is left at /output/*.rpm inside the image and can be
 # copied out by the Makefile.
 
-FROM rockylinux/rockylinux:10
+ARG BASE_IMAGE=rockylinux/rockylinux:10
+FROM ${BASE_IMAGE}
+
+# gcc-toolset used on EL8 (its default gcc 8.5 is too old to build RStudio).
+# Ignored on EL9/EL10, whose system gcc is new enough.
+ARG GCC_TOOLSET=gcc-toolset-14
 
 # ---------------------------------------------------------------------------
 # Build arguments (overridable from the Makefile)
@@ -23,13 +30,19 @@ ENV RSTUDIO_VERSION_MAJOR=${RSTUDIO_VERSION_MAJOR} \
     RSTUDIO_VERSION_SUFFIX=${RSTUDIO_VERSION_SUFFIX}
 
 # ---------------------------------------------------------------------------
-# Base tooling + repositories
-#   - CRB (CodeReady Builder) provides -devel packages the build needs
+# Base tooling + repositories (OS-aware)
+#   - the -devel "extras" repo is `crb` on EL9/EL10 and `powertools` on EL8
 #   - EPEL provides ant / xml-commons-apis and other extras
+#   - on EL8 we also install gcc-toolset (newer compiler) for the build
 # ---------------------------------------------------------------------------
 RUN set -eux; \
+    . /etc/os-release; major="${VERSION_ID%%.*}"; \
     dnf -y install dnf-plugins-core; \
-    dnf config-manager --set-enabled crb || dnf config-manager --enable crb; \
+    if [ "$major" -ge 9 ]; then \
+        dnf config-manager --set-enabled crb || dnf config-manager --enable crb; \
+    else \
+        dnf config-manager --set-enabled powertools || dnf config-manager --enable powertools; \
+    fi; \
     dnf -y install epel-release; \
     dnf -y update; \
     dnf -y install \
@@ -38,6 +51,7 @@ RUN set -eux; \
         ninja-build \
         python3 \
         ca-certificates; \
+    if [ "$major" -lt 9 ]; then dnf -y install "${GCC_TOOLSET}"; fi; \
     dnf clean all
 
 # ---------------------------------------------------------------------------
@@ -70,21 +84,29 @@ RUN set -eux; \
 # ../common/install-common to download/compile the bundled dependencies.
 # This is the heaviest, slowest layer; kept separate so it caches well.
 #
-# Rocky/RHEL 10 renamed or split four of the packages the upstream (Fedora/
-# RHEL-targeted) list expects.  Patch the list in place before running:
-#   java            -> java-21-openjdk         (default JDK on EL10)
+# The upstream (Fedora/RHEL) package list needs a few names patched for current
+# Rocky releases. Patch the list in place before running:
+#   java            -> java-21-openjdk        (unversioned name gone; EL8 + EL10)
 #   java-devel      -> java-21-openjdk-devel
-#   postgresql-devel-> libpq-devel             (client headers were split out)
-#   zlib-devel      -> zlib-ng-compat-devel    (zlib replaced by zlib-ng)
+#   postgresql-devel-> libpq-devel            (client headers split out; EL8+EL10)
+#   zlib-devel      -> zlib-ng-compat-devel   (EL10 ONLY; EL8 keeps zlib-devel)
+#
+# On EL8 the gcc-toolset compiler is activated first so install-common compiles
+# the bundled deps (boost, soci, ...) with the same modern toolchain as the
+# RStudio build itself.
 # ---------------------------------------------------------------------------
 WORKDIR /src/rstudio/dependencies/linux
 RUN set -eux; \
+    . /etc/os-release; major="${VERSION_ID%%.*}"; \
     sed -E -i \
         -e 's/^([[:space:]]*)java$/\1java-21-openjdk/' \
         -e 's/^([[:space:]]*)java-devel$/\1java-21-openjdk-devel/' \
         -e 's/^([[:space:]]*)postgresql-devel$/\1libpq-devel/' \
-        -e 's/^([[:space:]]*)zlib-devel$/\1zlib-ng-compat-devel/' \
         install-dependencies-yum; \
+    if [ "$major" -ge 9 ]; then \
+        sed -E -i 's/^([[:space:]]*)zlib-devel$/\1zlib-ng-compat-devel/' install-dependencies-yum; \
+    fi; \
+    if [ -f "/opt/rh/${GCC_TOOLSET}/enable" ]; then . "/opt/rh/${GCC_TOOLSET}/enable"; fi; \
     ./install-dependencies-yum
 
 # ---------------------------------------------------------------------------

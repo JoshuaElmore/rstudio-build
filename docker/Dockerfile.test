@@ -1,27 +1,37 @@
 # syntax=docker/dockerfile:1
 #
-# Installs the freshly built RStudio Server RPM on a clean Rocky Linux 10
+# Installs the freshly built RStudio Server RPM on a clean Rocky Linux (8 or 10)
 # image, alongside R, and runs a smoke test.
+#
+# The Makefile builds this with a small, OS-specific context dir containing just
+# the right *.rpm and test-rpm.sh, and passes BASE_IMAGE to match the build OS.
 
-FROM rockylinux/rockylinux:10
+ARG BASE_IMAGE=rockylinux/rockylinux:10
+FROM ${BASE_IMAGE}
 
-# Repos: CRB + EPEL provide R and assorted runtime libraries.
+# Repos: crb (EL9/EL10) / powertools (EL8) + EPEL provide R and runtime libs.
 #
 # NOTE: Rocky containers ship `tsflags=nodocs` in /etc/dnf/dnf.conf, which
 # strips %doc files. R's doc dir (/usr/share/doc/R) is a %doc directory, and
 # rserver refuses to start if it is missing ("R doc dir not found"). Install R
 # with docs enabled (tsflags='') so that directory exists.
 RUN set -eux; \
+    . /etc/os-release; major="${VERSION_ID%%.*}"; \
     dnf -y install dnf-plugins-core; \
-    dnf config-manager --set-enabled crb || dnf config-manager --enable crb; \
+    if [ "$major" -ge 9 ]; then \
+        dnf config-manager --set-enabled crb || dnf config-manager --enable crb; \
+    else \
+        dnf config-manager --set-enabled powertools || dnf config-manager --enable powertools; \
+    fi; \
     dnf -y install epel-release; \
     dnf -y --setopt=tsflags='' install R-core; \
     dnf -y install procps-ng curl shadow-utils; \
     dnf clean all
 
-# The RPM is copied into the image build context by the Makefile.
-COPY output/*.rpm /tmp/
-COPY scripts/test-rpm.sh /usr/local/bin/test-rpm.sh
+# Build context is the Makefile's OS-specific staging dir: it contains the one
+# correct *.rpm plus test-rpm.sh.
+COPY *.rpm /tmp/
+COPY test-rpm.sh /usr/local/bin/test-rpm.sh
 RUN chmod +x /usr/local/bin/test-rpm.sh
 
 # Install the RPM (and resolve any runtime deps).
