@@ -1,0 +1,105 @@
+# syntax=docker/dockerfile:1
+#
+# Builds RStudio Server from source on Rocky Linux 10 and produces an RPM.
+#
+# The resulting RPM is left at /output/*.rpm inside the image and can be
+# copied out by the Makefile.
+
+FROM rockylinux/rockylinux:10
+
+# ---------------------------------------------------------------------------
+# Build arguments (overridable from the Makefile)
+# ---------------------------------------------------------------------------
+ARG RSTUDIO_GIT_URL=https://github.com/rstudio/rstudio.git
+ARG RSTUDIO_GIT_REF=v2026.05.0+218
+ARG RSTUDIO_VERSION_MAJOR=2026
+ARG RSTUDIO_VERSION_MINOR=05
+ARG RSTUDIO_VERSION_PATCH=0
+ARG RSTUDIO_VERSION_SUFFIX=+218
+
+ENV RSTUDIO_VERSION_MAJOR=${RSTUDIO_VERSION_MAJOR} \
+    RSTUDIO_VERSION_MINOR=${RSTUDIO_VERSION_MINOR} \
+    RSTUDIO_VERSION_PATCH=${RSTUDIO_VERSION_PATCH} \
+    RSTUDIO_VERSION_SUFFIX=${RSTUDIO_VERSION_SUFFIX}
+
+# ---------------------------------------------------------------------------
+# Base tooling + repositories
+#   - CRB (CodeReady Builder) provides -devel packages the build needs
+#   - EPEL provides ant / xml-commons-apis and other extras
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    dnf -y install dnf-plugins-core; \
+    dnf config-manager --set-enabled crb || dnf config-manager --enable crb; \
+    dnf -y install epel-release; \
+    dnf -y update; \
+    dnf -y install \
+        git sudo which file findutils tar gzip xz unzip \
+        gcc gcc-c++ make patch \
+        ninja-build \
+        python3 \
+        ca-certificates; \
+    dnf clean all
+
+# ---------------------------------------------------------------------------
+# Fetch the exact tag (shallow clone of the single ref)
+# ---------------------------------------------------------------------------
+WORKDIR /src
+RUN set -eux; \
+    git init rstudio; \
+    cd rstudio; \
+    git remote add origin "${RSTUDIO_GIT_URL}"; \
+    git fetch --depth 1 origin "refs/tags/${RSTUDIO_GIT_REF}"; \
+    git checkout FETCH_HEAD; \
+    git log -1 --oneline
+
+# ---------------------------------------------------------------------------
+# R is required at BUILD time: dependencies/common/install-packages runs R to
+# install a small preset of R packages (digest purrr rmarkdown testthat xml2
+# yaml) from source. That needs R + its headers, a Fortran compiler (pulled in
+# by some CRAN deps), and libxml2-devel (for the xml2 package).
+# EPEL (enabled above) provides R on EL10.
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    dnf -y install R R-core-devel gcc-gfortran libxml2-devel libcurl-devel; \
+    dnf clean all; \
+    R --version | head -1
+
+# ---------------------------------------------------------------------------
+# Install OS + common (node, boost, quarto, pandoc, soci, ...) dependencies.
+# install-dependencies-yum installs the dnf packages and then calls
+# ../common/install-common to download/compile the bundled dependencies.
+# This is the heaviest, slowest layer; kept separate so it caches well.
+#
+# Rocky/RHEL 10 renamed or split four of the packages the upstream (Fedora/
+# RHEL-targeted) list expects.  Patch the list in place before running:
+#   java            -> java-21-openjdk         (default JDK on EL10)
+#   java-devel      -> java-21-openjdk-devel
+#   postgresql-devel-> libpq-devel             (client headers were split out)
+#   zlib-devel      -> zlib-ng-compat-devel    (zlib replaced by zlib-ng)
+# ---------------------------------------------------------------------------
+WORKDIR /src/rstudio/dependencies/linux
+RUN set -eux; \
+    sed -E -i \
+        -e 's/^([[:space:]]*)java$/\1java-21-openjdk/' \
+        -e 's/^([[:space:]]*)java-devel$/\1java-21-openjdk-devel/' \
+        -e 's/^([[:space:]]*)postgresql-devel$/\1libpq-devel/' \
+        -e 's/^([[:space:]]*)zlib-devel$/\1zlib-ng-compat-devel/' \
+        install-dependencies-yum; \
+    ./install-dependencies-yum
+
+# ---------------------------------------------------------------------------
+# Build the Server RPM.
+# make-package <Target> <Package> -> Server RPM
+# CPack writes the .rpm into the build directory under package/linux.
+# ---------------------------------------------------------------------------
+WORKDIR /src/rstudio/package/linux
+COPY scripts/build-rpm.sh /usr/local/bin/build-rpm.sh
+RUN chmod +x /usr/local/bin/build-rpm.sh && /usr/local/bin/build-rpm.sh
+
+# Collect the produced RPM(s) in a predictable location.
+RUN set -eux; \
+    mkdir -p /output; \
+    find /src/rstudio/package/linux -name 'rstudio-server-*.rpm' -exec cp -v {} /output/ \; ; \
+    ls -l /output/*.rpm
+
+CMD ["/bin/bash", "-c", "ls -l /output/*.rpm"]
