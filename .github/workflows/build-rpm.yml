@@ -1,0 +1,117 @@
+name: Build RStudio Server RPM (Rocky Linux 10)
+
+# Compiles RStudio Server from source inside a Rocky Linux 10 container,
+# produces a relocatable RPM, smoke-tests it, and uploads it as an artifact.
+#
+# This drives the SAME Makefile / Dockerfiles used locally — CI only swaps in
+# `docker buildx build` + GitHub Actions layer caching via the Makefile's
+# DOCKER_BUILD / BUILD_FLAGS hooks. Locally those default to plain
+# `sudo docker build`, so `make all` behaves identically on a workstation.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rstudio_ref:
+        description: "RStudio git tag/ref to build"
+        default: "v2026.05.0+218"
+      version_major:
+        description: "RSTUDIO_VERSION_MAJOR"
+        default: "2026"
+      version_minor:
+        description: "RSTUDIO_VERSION_MINOR"
+        default: "05"
+      version_patch:
+        description: "RSTUDIO_VERSION_PATCH"
+        default: "0"
+      version_suffix:
+        description: "RSTUDIO_VERSION_SUFFIX"
+        default: "+218"
+  push:
+    tags:
+      - "v*"
+
+# Avoid stacking expensive builds on the same ref.
+concurrency:
+  group: build-rpm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    env:
+      # CI overrides for the Makefile. Local `make` does not set these and so
+      # keeps using `sudo docker build` with no extra flags.
+      DOCKER: docker
+      DOCKER_BUILD: docker buildx build
+      BUILD_FLAGS: >-
+        --cache-from type=gha
+        --cache-to type=gha,mode=max
+        --load
+      # Build parameters: workflow_dispatch inputs win; otherwise fall back to
+      # the Makefile's own defaults (the pinned v2026.05.0+218).
+      RSTUDIO_GIT_REF: ${{ github.event.inputs.rstudio_ref || 'v2026.05.0+218' }}
+      RSTUDIO_VERSION_MAJOR: ${{ github.event.inputs.version_major || '2026' }}
+      RSTUDIO_VERSION_MINOR: ${{ github.event.inputs.version_minor || '05' }}
+      RSTUDIO_VERSION_PATCH: ${{ github.event.inputs.version_patch || '0' }}
+      RSTUDIO_VERSION_SUFFIX: ${{ github.event.inputs.version_suffix || '+218' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free up runner disk space
+        # The RStudio build (bundled boost, node, quarto, compiled tree) needs
+        # several GB; clear large preinstalled toolchains the build doesn't use.
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+                      /opt/hostedtoolcache/CodeQL /usr/local/.ghcup || true
+          docker image prune -af || true
+          df -h /
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the relocatable RPM
+        run: |
+          make rpm \
+            DOCKER="$DOCKER" \
+            DOCKER_BUILD="$DOCKER_BUILD" \
+            BUILD_FLAGS="$BUILD_FLAGS" \
+            RSTUDIO_GIT_REF="$RSTUDIO_GIT_REF" \
+            RSTUDIO_VERSION_MAJOR="$RSTUDIO_VERSION_MAJOR" \
+            RSTUDIO_VERSION_MINOR="$RSTUDIO_VERSION_MINOR" \
+            RSTUDIO_VERSION_PATCH="$RSTUDIO_VERSION_PATCH" \
+            RSTUDIO_VERSION_SUFFIX="$RSTUDIO_VERSION_SUFFIX"
+
+      - name: Show built RPM(s)
+        # Relocatability + a live server run are asserted inside the container
+        # by the smoke-test step below (scripts/test-rpm.sh).
+        run: ls -l output/*.rpm
+
+      - name: Smoke-test the RPM (install + run on clean Rocky 10)
+        run: |
+          make test \
+            DOCKER="$DOCKER" \
+            DOCKER_BUILD="$DOCKER_BUILD" \
+            BUILD_FLAGS="$BUILD_FLAGS" \
+            RSTUDIO_GIT_REF="$RSTUDIO_GIT_REF" \
+            RSTUDIO_VERSION_MAJOR="$RSTUDIO_VERSION_MAJOR" \
+            RSTUDIO_VERSION_MINOR="$RSTUDIO_VERSION_MINOR" \
+            RSTUDIO_VERSION_PATCH="$RSTUDIO_VERSION_PATCH" \
+            RSTUDIO_VERSION_SUFFIX="$RSTUDIO_VERSION_SUFFIX"
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rstudio-server-rpm-${{ env.RSTUDIO_VERSION_MAJOR }}.${{ env.RSTUDIO_VERSION_MINOR }}.${{ env.RSTUDIO_VERSION_PATCH }}
+          path: output/*.rpm
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Attach RPM to GitHub Release (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: output/*.rpm

@@ -15,8 +15,9 @@ Rocky 10 image.
 | `scripts/build-rpm.sh` | Runs `package/linux/make-package Server RPM` in the builder. |
 | `scripts/test-rpm.sh` | `verify-installation`, starts `rserver`, curls the login page. |
 | `output/` | Extracted `.rpm` artifacts land here. |
+| `.github/workflows/build-rpm.yml` | GitHub Actions: runs the same build + test in CI and uploads the RPM. |
 
-## Usage
+## Usage (local)
 
 ```bash
 make rpm     # compile + build the RPM, copied to ./output/
@@ -34,6 +35,35 @@ make all \
   RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=05 \
   RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+218
 ```
+
+## GitHub Actions
+
+`.github/workflows/build-rpm.yml` runs the **exact same** Makefile/Dockerfiles in
+CI. Trigger it manually (**Actions → Build RStudio Server RPM → Run workflow**,
+with optional tag/version inputs) or by pushing a `v*` tag. The workflow:
+
+1. frees runner disk space (the build needs several GB),
+2. `make rpm` — compiles + builds the relocatable RPM,
+3. `make test` — installs it on a clean Rocky 10 image and smoke-tests it,
+4. uploads the RPM as a build artifact (and attaches it to the GitHub Release on
+   tag pushes).
+
+### Local vs CI parity
+
+CI does not fork the build logic. It only overrides three Makefile variables so
+the build can use BuildKit layer caching:
+
+```bash
+make all \
+  DOCKER=docker \
+  DOCKER_BUILD="docker buildx build" \
+  BUILD_FLAGS="--cache-from type=gha --cache-to type=gha,mode=max --load"
+```
+
+Locally these default to `DOCKER=sudo docker`, `DOCKER_BUILD=$(DOCKER) build`,
+and empty `BUILD_FLAGS`, producing the identical `sudo docker build …` command —
+so `make all` keeps working unchanged on a workstation. (`type=gha` cache only
+works inside GitHub Actions; omit `BUILD_FLAGS` anywhere else.)
 
 ## Notes
 
