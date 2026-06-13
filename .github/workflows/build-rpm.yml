@@ -1,4 +1,4 @@
-name: Build RStudio Server RPM (Rocky Linux 10)
+name: Build RStudio Server RPM (Rocky Linux 8 & 10)
 
 # Compiles RStudio Server from source inside a Rocky Linux 10 container,
 # produces a relocatable RPM, smoke-tests it, and uploads it as an artifact.
@@ -40,14 +40,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
+    strategy:
+      fail-fast: false
+      matrix:
+        rocky: ["10", "8"]   # build + test on both Rocky Linux 8 and 10
+
     env:
+      # Target OS for this matrix leg (consumed by the Makefile's ROCKY var).
+      ROCKY: ${{ matrix.rocky }}
       # CI overrides for the Makefile. Local `make` does not set these and so
       # keeps using `sudo docker build` with no extra flags.
       DOCKER: docker
       DOCKER_BUILD: docker buildx build
+      # Per-OS cache scope so the two legs don't evict each other.
       BUILD_FLAGS: >-
-        --cache-from type=gha
-        --cache-to type=gha,mode=max
+        --cache-from type=gha,scope=rocky${{ matrix.rocky }}
+        --cache-to type=gha,mode=max,scope=rocky${{ matrix.rocky }}
         --load
       # Build parameters: workflow_dispatch inputs win; otherwise fall back to
       # the Makefile's own defaults (the pinned v2026.05.0+218).
@@ -73,9 +81,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build the relocatable RPM
+      - name: Build the relocatable RPM (Rocky ${{ matrix.rocky }})
         run: |
           make rpm \
+            ROCKY="$ROCKY" \
             DOCKER="$DOCKER" \
             DOCKER_BUILD="$DOCKER_BUILD" \
             BUILD_FLAGS="$BUILD_FLAGS" \
@@ -88,11 +97,12 @@ jobs:
       - name: Show built RPM(s)
         # Relocatability + a live server run are asserted inside the container
         # by the smoke-test step below (scripts/test-rpm.sh).
-        run: ls -l output/*.rpm
+        run: ls -l output/rocky${{ matrix.rocky }}/*.rpm
 
-      - name: Smoke-test the RPM (install + run on clean Rocky 10)
+      - name: Smoke-test the RPM (install + run on clean Rocky ${{ matrix.rocky }})
         run: |
           make test \
+            ROCKY="$ROCKY" \
             DOCKER="$DOCKER" \
             DOCKER_BUILD="$DOCKER_BUILD" \
             BUILD_FLAGS="$BUILD_FLAGS" \
@@ -105,8 +115,8 @@ jobs:
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rstudio-server-rpm-${{ env.RSTUDIO_VERSION_MAJOR }}.${{ env.RSTUDIO_VERSION_MINOR }}.${{ env.RSTUDIO_VERSION_PATCH }}
-          path: output/*.rpm
+          name: rstudio-server-rpm-rocky${{ matrix.rocky }}-${{ env.RSTUDIO_VERSION_MAJOR }}.${{ env.RSTUDIO_VERSION_MINOR }}.${{ env.RSTUDIO_VERSION_PATCH }}
+          path: output/rocky${{ matrix.rocky }}/*.rpm
           if-no-files-found: error
           retention-days: 14
 
@@ -114,4 +124,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: output/*.rpm
+          files: output/rocky${{ matrix.rocky }}/*.rpm
