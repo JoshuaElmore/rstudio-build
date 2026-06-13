@@ -50,7 +50,8 @@ RSTUDIO_BUILD := $(subst +,,$(RSTUDIO_VERSION_SUFFIX))
 ARCH          ?= x86_64
 BUILD_IMAGE   ?= rstudio-server-build:$(VER)-rocky$(ROCKY)
 TEST_IMAGE    ?= rstudio-server-test:$(VER)-rocky$(ROCKY)
-OUTPUT_DIR    ?= output/rocky$(ROCKY)
+OUTPUT_ROOT   ?= output
+OUTPUT_DIR    ?= $(OUTPUT_ROOT)/rocky$(ROCKY)
 # Canonical RPM filename: RStudio version + build, the target OS, and arch.
 # e.g. rstudio-server-2026.05.0-218.el8.x86_64.rpm
 RPM_FILENAME  ?= rstudio-server-$(VER)-$(RSTUDIO_BUILD).el$(ROCKY).$(ARCH).rpm
@@ -120,4 +121,4 @@ shell: image
 clean:
 	-$(DOCKER) rm -f rstudio-extract-rocky$(ROCKY) 2>/dev/null
 	-$(DOCKER) rmi $(TEST_IMAGE) $(BUILD_IMAGE) 2>/dev/null
-	rm -rf $(OUTPUT_DIR)
+	rm -rf $(OUTPUT_ROOT)

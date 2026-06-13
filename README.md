@@ -24,7 +24,7 @@ make rpm     # compile + build the RPM, copied to ./output/rocky<N>/
 make test    # install the RPM on a clean image and smoke-test it
 make all     # rpm + test (default)
 make shell   # debug shell in the builder image
-make clean   # remove images and ./output/rocky<N> (for the current ROCKY)
+make clean   # remove the current ROCKY's images + the entire ./output/ tree
 ```
 
 ### Choosing the OS (Rocky 8 or 10)
