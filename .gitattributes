@@ -1,0 +1,6 @@
+# Ensure scripts run inside Linux containers always use LF line endings,
+# regardless of the host platform or core.autocrlf setting.
+*.sh            text eol=lf
+Dockerfile*     text eol=lf
+Makefile        text eol=lf
+*.mk            text eol=lf
