@@ -1,7 +1,7 @@
 # Build RStudio Server RPMs on Rocky Linux 8 / 10 (Docker)
 
 Compiles [RStudio Server](https://github.com/rstudio/rstudio) from source —
-pinned to tag **`v2026.05.0+218`** ("Golden Wattle") — inside a Rocky Linux
+pinned to tag **`v2026.06.0+242`** — inside a Rocky Linux
 container, produces an installable, **relocatable RPM**, then smoke-tests it on a
 clean Rocky image. Builds for **Rocky Linux 8 or 10** (`ROCKY=8` / `ROCKY=10`).
 
@@ -47,8 +47,8 @@ The extracted RPM is renamed to encode the **RStudio version** and the **Linux
 version**:
 
 ```
-output/rocky10/rstudio-server-2026.05.0-218.el10.x86_64.rpm
-output/rocky8/rstudio-server-2026.05.0-218.el8.x86_64.rpm
+output/rocky10/rstudio-server-2026.06.0-242.el10.x86_64.rpm
+output/rocky8/rstudio-server-2026.06.0-242.el8.x86_64.rpm
                             └──── version ────┘ └OS┘ └arch┘
 ```
 
@@ -56,9 +56,9 @@ output/rocky8/rstudio-server-2026.05.0-218.el8.x86_64.rpm
 
 ```bash
 make all \
-  RSTUDIO_GIT_REF=v2026.05.0+218 \
-  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=05 \
-  RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+218
+  RSTUDIO_GIT_REF=v2026.06.0+242 \
+  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=06 \
+  RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+242
 ```
 
 ## GitHub Actions

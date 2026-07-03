@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 #
 # Installs the freshly built RStudio Server RPM on a clean Rocky Linux (8 or 10)
 # image, alongside R, and runs a smoke test.

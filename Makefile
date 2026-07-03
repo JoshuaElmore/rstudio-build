@@ -16,9 +16,9 @@
 # Artifacts and images are kept separate per OS (output/rocky<N>, image tags).
 #
 # Override the target tag/version on the command line, e.g.:
-#   make rpm RSTUDIO_GIT_REF=v2026.05.0+218 \
-#            RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=05 \
-#            RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+218
+#   make rpm RSTUDIO_GIT_REF=v2026.06.0+242 \
+#            RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=06 \
+#            RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+242
 # =============================================================================
 
 # ---- Configuration ----------------------------------------------------------
@@ -27,7 +27,7 @@ ROCKY                  ?= 10
 BASE_IMAGE             ?= rockylinux/rockylinux:$(ROCKY)
 
 RSTUDIO_GIT_URL        ?= https://github.com/rstudio/rstudio.git
-RSTUDIO_GIT_REF        ?= v2026.05.0+218
+RSTUDIO_GIT_REF        ?= v2026.06.0+242
 RSTUDIO_VERSION_MAJOR  ?= 2026
 RSTUDIO_VERSION_MINOR  ?= 06
 RSTUDIO_VERSION_PATCH  ?= 0
@@ -45,7 +45,7 @@ BUILD_FLAGS   ?=
 # Image tags and output dir are namespaced per OS so rocky8 / rocky10 builds
 # never clobber each other (CPack names the RPM file identically for both).
 VER           := $(RSTUDIO_VERSION_MAJOR).$(RSTUDIO_VERSION_MINOR).$(RSTUDIO_VERSION_PATCH)
-# Build number from the version suffix ("+218" -> "218").
+# Build number from the version suffix ("+242" -> "242").
 RSTUDIO_BUILD := $(subst +,,$(RSTUDIO_VERSION_SUFFIX))
 ARCH          ?= x86_64
 BUILD_IMAGE   ?= rstudio-server-build:$(VER)-rocky$(ROCKY)
@@ -53,7 +53,7 @@ TEST_IMAGE    ?= rstudio-server-test:$(VER)-rocky$(ROCKY)
 OUTPUT_ROOT   ?= output
 OUTPUT_DIR    ?= $(OUTPUT_ROOT)/rocky$(ROCKY)
 # Canonical RPM filename: RStudio version + build, the target OS, and arch.
-# e.g. rstudio-server-2026.05.0-218.el8.x86_64.rpm
+# e.g. rstudio-server-2026.06.0-242.el8.x86_64.rpm
 RPM_FILENAME  ?= rstudio-server-$(VER)-$(RSTUDIO_BUILD).el$(ROCKY).$(ARCH).rpm
 
 # Pass docker build args from the configuration above.
