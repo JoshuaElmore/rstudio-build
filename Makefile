@@ -29,9 +29,9 @@ BASE_IMAGE             ?= rockylinux/rockylinux:$(ROCKY)
 RSTUDIO_GIT_URL        ?= https://github.com/rstudio/rstudio.git
 RSTUDIO_GIT_REF        ?= v2026.05.0+218
 RSTUDIO_VERSION_MAJOR  ?= 2026
-RSTUDIO_VERSION_MINOR  ?= 05
+RSTUDIO_VERSION_MINOR  ?= 06
 RSTUDIO_VERSION_PATCH  ?= 0
-RSTUDIO_VERSION_SUFFIX ?= +218
+RSTUDIO_VERSION_SUFFIX ?= +242
 
 # This host's user is not in the docker group but has passwordless `sudo docker`.
 # Override with `make DOCKER=docker` if your user can talk to the daemon directly.
@@ -119,6 +119,6 @@ shell: image
 
 # ---- Cleanup ----------------------------------------------------------------
 clean:
-	-$(DOCKER) rm -f rstudio-extract-rocky$(ROCKY) 2>/dev/null
-	-$(DOCKER) rmi $(TEST_IMAGE) $(BUILD_IMAGE) 2>/dev/null
+	$(DOCKER) rm -f rstudio-extract-rocky$(ROCKY) 2>/dev/null || true
+	$(DOCKER) rmi $(TEST_IMAGE) $(BUILD_IMAGE) 2>/dev/null || true
 	rm -rf $(OUTPUT_ROOT)
