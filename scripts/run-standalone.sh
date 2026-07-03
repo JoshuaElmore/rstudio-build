@@ -24,6 +24,8 @@
 #   -P, --port N        TCP port to listen on (default: 8787)
 #   -a, --address ADDR  Address to bind (default: 127.0.0.1; use 0.0.0.0 for LAN)
 #   -w, --work DIR      Writable state dir (default: ~/.local/share/rstudio-standalone)
+#   -R, --r-bin PATH    Path to the R executable to use (or an R home / bin dir).
+#                       Default: the 'R' found on $PATH.
 #       --password PW   Require login as the current user with password PW.
 #                       Omit to run with NO authentication (localhost only!).
 #       --bwrap         Force bind-mounting the work dir over /etc/rstudio using
@@ -41,6 +43,7 @@ PREFIX="${RSTUDIO_PREFIX:-/home/joshua/rstudio}"
 PORT=8787
 ADDRESS=127.0.0.1
 WORK="${XDG_DATA_HOME:-$HOME/.local/share}/rstudio-standalone"
+R_BIN="${RSTUDIO_WHICH_R:-}"
 PASSWORD=""
 USE_BWRAP=0
 
@@ -54,6 +57,7 @@ while [ $# -gt 0 ]; do
         -P|--port)     PORT="${2:?}"; shift 2;;
         -a|--address)  ADDRESS="${2:?}"; shift 2;;
         -w|--work)     WORK="${2:?}"; shift 2;;
+        -R|--r-bin)    R_BIN="${2:?}"; shift 2;;
         --password)    PASSWORD="${2:?}"; shift 2;;
         --bwrap)       USE_BWRAP=1; shift;;
         -h|--help)     show_help; exit 0;;
@@ -129,12 +133,25 @@ ARGS=(
     --secure-cookie-key-file="$COOKIE_KEY"
 )
 
-# Point rserver at this install's rsession and R (helps when they are not on PATH
-# or when R comes from a conda/module environment).
+# Point rserver at this install's rsession.
 [ -x "$RSESSION" ] && ARGS+=( --rsession-path="$RSESSION" )
-if R_BIN="$(command -v R 2>/dev/null)"; then
-    ARGS+=( --rsession-which-r="$R_BIN" )
+
+# Resolve the R executable. Use --r-bin/$RSTUDIO_WHICH_R if given (accepting a
+# direct path to R, an R home, or a bin dir); otherwise fall back to $PATH.
+if [ -n "$R_BIN" ]; then
+    if [ -d "$R_BIN" ]; then
+        # a directory was given: try <dir>/bin/R then <dir>/R
+        if   [ -x "$R_BIN/bin/R" ]; then R_BIN="$R_BIN/bin/R"
+        elif [ -x "$R_BIN/R" ];     then R_BIN="$R_BIN/R"
+        else die "no R executable under: $R_BIN (looked for bin/R and R)"
+        fi
+    fi
+    [ -x "$R_BIN" ] || die "R executable not found or not executable: $R_BIN"
+else
+    R_BIN="$(command -v R 2>/dev/null || true)"
+    [ -n "$R_BIN" ] || die "no R found on \$PATH; specify one with --r-bin PATH"
 fi
+ARGS+=( --rsession-which-r="$R_BIN" )
 
 # ---------------------------------------------------------------------------
 # Authentication
@@ -199,6 +216,7 @@ cat <<EOF
   prefix : $PREFIX
   work   : $WORK
   user   : $ME
+  R      : $R_BIN
   auth   : $AUTH_MSG
   URL    : http://$URL_HOST:$PORT
 
