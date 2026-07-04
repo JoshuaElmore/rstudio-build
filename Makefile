@@ -2,13 +2,18 @@
 # Build RStudio Server RPMs from source on Rocky Linux (8 or 10), in Docker,
 # and test.
 #
-#   make rpm     - build the RStudio Server RPM and copy it into ./output/
-#   make test    - install the RPM on a clean Rocky image and smoke-test it
-#   make all     - rpm + test (default)
-#   make rocky10 - build + test for Rocky 10 (alias for: make all ROCKY=10)
-#   make rocky8  - build + test for Rocky 8  (alias for: make all ROCKY=8)
-#   make shell   - open a shell in the builder image (debugging)
-#   make clean   - remove build artifacts and images (current ROCKY)
+#   make rpm            - build the RStudio Server RPM and copy it into ./output/
+#   make test           - install the RPM on a clean Rocky image and smoke-test it
+#   make standalone     - build a NON-ROOT install tarball (.tar.gz, no rpm,
+#                         no systemd) into ./output/
+#   make test-standalone- extract + run the standalone tarball as an unprivileged
+#                         user on a clean image and smoke-test it
+#   make all            - build + test BOTH the RPM and the standalone tarball
+#                         (default)
+#   make rocky10        - build + test for Rocky 10 (alias for: make all ROCKY=10)
+#   make rocky8         - build + test for Rocky 8  (alias for: make all ROCKY=8)
+#   make shell          - open a shell in the builder image (debugging)
+#   make clean          - remove build artifacts and images (current ROCKY)
 #
 # Select the build OS with ROCKY (default 10):
 #   make all ROCKY=8            # build + test on Rocky Linux 8
@@ -50,11 +55,17 @@ RSTUDIO_BUILD := $(subst +,,$(RSTUDIO_VERSION_SUFFIX))
 ARCH          ?= x86_64
 BUILD_IMAGE   ?= rstudio-server-build:$(VER)-rocky$(ROCKY)
 TEST_IMAGE    ?= rstudio-server-test:$(VER)-rocky$(ROCKY)
+SA_TEST_IMAGE ?= rstudio-server-standalone-test:$(VER)-rocky$(ROCKY)
 OUTPUT_ROOT   ?= output
 OUTPUT_DIR    ?= $(OUTPUT_ROOT)/rocky$(ROCKY)
 # Canonical RPM filename: RStudio version + build, the target OS, and arch.
 # e.g. rstudio-server-2026.06.0-242.el8.x86_64.rpm
 RPM_FILENAME  ?= rstudio-server-$(VER)-$(RSTUDIO_BUILD).el$(ROCKY).$(ARCH).rpm
+# Standalone tarball filename. MUST match the name make-standalone.sh derives
+# inside the container (version + build + el<N> + arch), so the Makefile can
+# copy exactly that file out. e.g.
+# rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
+STANDALONE_FILENAME ?= rstudio-server-$(VER)-$(RSTUDIO_BUILD).el$(ROCKY).$(ARCH)-standalone.tar.gz
 
 # Pass docker build args from the configuration above.
 BUILD_ARGS = \
@@ -67,9 +78,13 @@ BUILD_ARGS = \
 	--build-arg RSTUDIO_VERSION_SUFFIX=$(RSTUDIO_VERSION_SUFFIX)
 
 .DEFAULT_GOAL := all
-.PHONY: all image rpm test shell clean rocky8 rocky10
+.PHONY: all image rpm test standalone test-standalone shell clean rocky8 rocky10
 
-all: rpm test
+# Build + test both artifacts: the RPM and the standalone tarball. Each phony
+# prerequisite runs once, and make orders them by their own dependencies
+# (test -> rpm; test-standalone -> standalone -> rpm), so the RPM is built once
+# and reused for both.
+all: rpm test standalone test-standalone
 
 # Convenience aliases for each supported OS.
 rocky10:
@@ -113,12 +128,45 @@ test: rpm
 	rm -rf $(OUTPUT_DIR)/.ctx
 	$(DOCKER) run --rm $(TEST_IMAGE)
 
+# ---- 2b. Build a standalone, non-root install tarball -----------------------
+# Turns the relocatable RPM into a plain .tar.gz an ordinary user extracts and
+# runs with NO root and NO systemd service. make-standalone.sh runs inside the
+# builder image (it has cpio + the packaging scripts), unpacks the RPM *payload*
+# (which contains no systemd unit / scriptlets), bundles the run-standalone.sh
+# launcher into a single top-level dir, and emits the tarball to /output; we
+# copy just that file out.
+standalone: rpm
+	@mkdir -p $(OUTPUT_DIR)
+	@echo ">> Building standalone (non-root, no-systemd) tarball from the RPM"
+	$(DOCKER) rm -f rstudio-standalone-rocky$(ROCKY) >/dev/null 2>&1 || true
+	$(DOCKER) run --name rstudio-standalone-rocky$(ROCKY) $(BUILD_IMAGE) \
+		/usr/local/bin/make-standalone.sh
+	$(DOCKER) cp rstudio-standalone-rocky$(ROCKY):/output/$(STANDALONE_FILENAME) $(OUTPUT_DIR)/
+	$(DOCKER) rm -f rstudio-standalone-rocky$(ROCKY) >/dev/null
+	@echo ">> Standalone tarball available:"
+	@ls -l $(OUTPUT_DIR)/$(STANDALONE_FILENAME)
+
+# ---- 2c. Smoke-test the standalone tarball as an UNPRIVILEGED user -----------
+# Builds a clean Rocky+R image with a normal (non-root) user, extracts the
+# tarball and launches the server as that user, and asserts it serves the
+# sign-in page with no systemd service anywhere. Proves the no-root/no-systemd
+# contract.
+test-standalone: standalone
+	@echo ">> Smoke-testing the standalone tarball as a non-root user (Rocky $(ROCKY))"
+	rm -rf $(OUTPUT_DIR)/.ctx-sa && mkdir -p $(OUTPUT_DIR)/.ctx-sa
+	cp $(OUTPUT_DIR)/$(STANDALONE_FILENAME) $(OUTPUT_DIR)/.ctx-sa/
+	cp scripts/test-standalone.sh $(OUTPUT_DIR)/.ctx-sa/
+	$(DOCKER_BUILD) $(BUILD_FLAGS) --build-arg BASE_IMAGE=$(BASE_IMAGE) \
+		-f docker/Dockerfile.standalone-test -t $(SA_TEST_IMAGE) $(OUTPUT_DIR)/.ctx-sa
+	rm -rf $(OUTPUT_DIR)/.ctx-sa
+	$(DOCKER) run --rm $(SA_TEST_IMAGE)
+
 # ---- Debug: shell into the builder ------------------------------------------
 shell: image
 	$(DOCKER) run --rm -it $(BUILD_IMAGE) /bin/bash
 
 # ---- Cleanup ----------------------------------------------------------------
 clean:
-	$(DOCKER) rm -f rstudio-extract-rocky$(ROCKY) 2>/dev/null || true
-	$(DOCKER) rmi $(TEST_IMAGE) $(BUILD_IMAGE) 2>/dev/null || true
+	$(DOCKER) rm -f rstudio-extract-rocky$(ROCKY) rstudio-standalone-rocky$(ROCKY) 2>/dev/null || true
+	$(DOCKER) rmi $(SA_TEST_IMAGE) $(TEST_IMAGE) $(BUILD_IMAGE) 2>/dev/null || true
 	rm -rf $(OUTPUT_ROOT)

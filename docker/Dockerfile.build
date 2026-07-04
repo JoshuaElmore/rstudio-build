@@ -123,4 +123,20 @@ RUN set -eux; \
     find /src/rstudio/package/linux -name 'rstudio-server-*.rpm' -exec cp -v {} /output/ \; ; \
     ls -l /output/*.rpm
 
-CMD ["/bin/bash", "-c", "ls -l /output/*.rpm"]
+# ---------------------------------------------------------------------------
+# Standalone (non-root) installer tooling.
+#
+# `make standalone` runs make-standalone.sh in this image to convert the
+# relocatable RPM in /output into a plain non-root install tarball (.tar.gz)
+# that a normal user extracts and runs with no root and no systemd service.
+# These scripts are copied LATE (after the heavy build) so editing them never
+# busts the build cache. make-standalone.sh unpacks the RPM payload with
+# `rpm2cpio | cpio`; rpm2cpio ships with the rpm package already here, and cpio
+# is installed in this late layer (it is not in the base tooling) so it never
+# busts the build cache above.
+# ---------------------------------------------------------------------------
+RUN dnf -y install cpio && dnf clean all
+COPY scripts/run-standalone.sh scripts/make-standalone.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/run-standalone.sh /usr/local/bin/make-standalone.sh
+
+CMD ["/bin/bash", "-c", "ls -l /output/*"]

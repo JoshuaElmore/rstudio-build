@@ -2,8 +2,12 @@
 
 Compiles [RStudio Server](https://github.com/rstudio/rstudio) from source —
 pinned to tag **`v2026.06.0+242`** — inside a Rocky Linux
-container, produces an installable, **relocatable RPM**, then smoke-tests it on a
-clean Rocky image. Builds for **Rocky Linux 8 or 10** (`ROCKY=8` / `ROCKY=10`).
+container, produces an installable, **relocatable RPM** *and* a **non-root
+standalone tarball**, then smoke-tests both on a clean Rocky image. Builds for
+**Rocky Linux 8 or 10** (`ROCKY=8` / `ROCKY=10`).
+
+> **New here?** See **[INSTALL.md](INSTALL.md)** for a step-by-step build +
+> install guide (both the RPM and the no-root tarball).
 
 ## Layout
 
@@ -12,20 +16,61 @@ clean Rocky image. Builds for **Rocky Linux 8 or 10** (`ROCKY=8` / `ROCKY=10`).
 | `Makefile` | Orchestrates everything (`build → extract → rename → test`). |
 | `docker/Dockerfile.build` | Rocky 8/10 builder: clones the tag, installs deps, builds the RPM. |
 | `docker/Dockerfile.test` | Rocky 8/10 + R: installs the RPM and runs the smoke test. |
+| `docker/Dockerfile.standalone-test` | Rocky 8/10 + R: extracts the standalone tarball **as a non-root user** and smoke-tests it. |
 | `scripts/build-rpm.sh` | Activates the right toolchain/JDK, runs `package/linux/make-package Server RPM`, makes the RPM relocatable. |
+| `scripts/make-standalone.sh` | Unpacks the relocatable RPM's payload and bundles it + `run-standalone.sh` into a non-root `.tar.gz`. |
+| `scripts/run-standalone.sh` | Launches RStudio Server as an ordinary user — no root, no systemd (state redirected out of `/var` and `/etc`). |
 | `scripts/test-rpm.sh` | Asserts relocatability, runs `verify-installation`, starts `rserver`, curls the login page. |
-| `output/rocky<N>/` | Extracted, renamed `.rpm` artifacts land here (per OS). |
-| `.github/workflows/build-rpm.yml` | GitHub Actions: runs the same build + test in CI (Rocky 8 & 10) and uploads the RPMs. |
+| `scripts/test-standalone.sh` | Extracts + runs the standalone tarball as a non-root user, asserts no systemd service, curls the login page. |
+| `output/rocky<N>/` | Extracted, renamed `.rpm` **and `…-standalone.tar.gz`** artifacts land here (per OS). |
 
 ## Usage (local)
 
 ```bash
-make rpm     # compile + build the RPM, copied to ./output/rocky<N>/
-make test    # install the RPM on a clean image and smoke-test it
-make all     # rpm + test (default)
-make shell   # debug shell in the builder image
-make clean   # remove the current ROCKY's images + the entire ./output/ tree
+make rpm             # compile + build the RPM, copied to ./output/rocky<N>/
+make test            # install the RPM on a clean image and smoke-test it
+make standalone      # build a non-root install tarball (.tar.gz, no rpm/systemd)
+make test-standalone # extract + run that tarball as a normal user and smoke-test it
+make all             # rpm + test (default)
+make shell           # debug shell in the builder image
+make clean           # remove the current ROCKY's images + the entire ./output/ tree
 ```
+
+## Non-root install (no rpm, no systemd)
+
+`make standalone` produces a **plain `.tar.gz`** that an ordinary user extracts
+and runs with no root, no `rpm`, and no systemd service:
+
+```
+output/rocky10/rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
+```
+
+It works by unpacking the relocatable RPM's *file payload* (the
+`/usr/lib/rstudio-server` tree) and bundling the `run-standalone.sh` launcher
+into a single top-level directory (plus a short `INSTALL.txt`). Everything that
+needs root — the systemd unit, the `/usr/bin` symlinks, the `rstudio-server`
+system user, `/etc/rstudio` — is created by the RPM's postinst *scriptlet*,
+which is **not** part of the payload, so a payload install is root-free and
+systemd-free by construction.
+
+```bash
+# On the target machine, as any normal user — extracting IS the install:
+tar -xzf rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
+cd rstudio-server-2026.06.0-242.el10.x86_64
+./run-standalone.sh                    # http://127.0.0.1:8787, no auth
+./run-standalone.sh --password 'secret'  # require a login
+./run-standalone.sh --help             # port, binding, R path, …
+```
+
+Extract it anywhere you like. The only runtime requirement is an `R` on the
+target (point at a specific one with `run-standalone.sh --r-bin PATH`). This is
+the same single-user approach Open OnDemand uses; state lives under
+`~/.local/share/rstudio-standalone` instead of root-owned `/var` and `/etc`.
+
+The build machine needs Docker; the **target does not** — copy the one `.tar.gz`
+to any compatible machine and extract it. Because the binaries link the build
+OS's glibc, build with `ROCKY` matching the target's RHEL family (`ROCKY=8` for
+EL8 targets, `ROCKY=10` for EL10) and a matching CPU arch (`x86_64`).
 
 ### Choosing the OS (Rocky 8 or 10)
 
