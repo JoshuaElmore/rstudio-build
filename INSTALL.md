@@ -36,8 +36,8 @@ OS's glibc:
 
 | Target OS family | Build with |
 |------------------|------------|
-| Enterprise Linux **8** (RHEL / AlmaLinux / Oracle / …) | `EL=8` |
-| Enterprise Linux **10** (RHEL / AlmaLinux / Oracle / …) | `EL=10` |
+| Enterprise Linux **8** (RHEL / AlmaLinux / Rocky / Oracle / …) | `EL=8` |
+| Enterprise Linux **10** (RHEL / AlmaLinux / Rocky / Oracle / …) | `EL=10` |
 
 A newer-glibc build will not start on an older target (an EL10 build won't run on
 EL8). When in doubt, build on the **oldest** generation you need to support. The
