@@ -37,8 +37,8 @@ you'll install, because the binaries link the build OS's glibc:
 
 | Target OS | Build with |
 |-----------|------------|
-| Enterprise Linux **8** (RHEL / AlmaLinux / Oracle / …) | `DISTRO=el EL=8` |
-| Enterprise Linux **10** (RHEL / AlmaLinux / Oracle / …) | `DISTRO=el EL=10` (default) |
+| Enterprise Linux **8** (RHEL / AlmaLinux / Rocky / Oracle / …) | `DISTRO=el EL=8` |
+| Enterprise Linux **10** (RHEL / AlmaLinux / Rocky / Oracle / …) | `DISTRO=el EL=10` (default) |
 | Ubuntu Server **24.04 LTS** ("noble") | `DISTRO=ubuntu UBUNTU=24.04` |
 | Ubuntu Server **26.04 LTS** | `DISTRO=ubuntu UBUNTU=26.04` |
 
