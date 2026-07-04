@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make -n all DISTRO=ubuntu UBUNTU=24.04)",
+      "Read(//tmp/**)",
+      "Bash(make -n all)",
+      "Bash(python3 -c \"import yaml, sys; yaml.safe_load\\(open\\('.github/workflows/build.yml'\\)\\); print\\('YAML parses OK'\\)\")",
+      "Bash(python -c \"import yaml, sys; yaml.safe_load\\(open\\('.github/workflows/build.yml'\\)\\); print\\('YAML parses OK'\\)\")"
+    ]
+  }
+}
