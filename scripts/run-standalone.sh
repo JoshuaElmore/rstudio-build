@@ -20,7 +20,9 @@
 #
 # Options:
 #   -p, --prefix DIR    RStudio install prefix (contains bin/rserver).
-#                       Default: $RSTUDIO_PREFIX or /home/joshua/rstudio
+#                       Default: $RSTUDIO_PREFIX, else this script's own
+#                       directory (where the standalone installer puts it),
+#                       else ~/rstudio.
 #   -P, --port N        TCP port to listen on (default: 8787)
 #   -a, --address ADDR  Address to bind (default: 127.0.0.1; use 0.0.0.0 for LAN)
 #   -w, --work DIR      Writable state dir (default: ~/.local/share/rstudio-standalone)
@@ -39,7 +41,18 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Defaults / argument parsing
 # ---------------------------------------------------------------------------
-PREFIX="${RSTUDIO_PREFIX:-/home/joshua/rstudio}"
+# Default prefix: honor $RSTUDIO_PREFIX; otherwise, if this script sits next to
+# a bin/rserver (the layout the standalone installer creates -- run-standalone.sh
+# lives at <prefix>/run-standalone.sh), use its own directory. Fall back to
+# ~/rstudio for a bare checkout.
+SELF_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "$0" 2>/dev/null || echo "$0")")" && pwd)"
+if [ -n "${RSTUDIO_PREFIX:-}" ]; then
+    PREFIX="$RSTUDIO_PREFIX"
+elif [ -x "$SELF_DIR/bin/rserver" ]; then
+    PREFIX="$SELF_DIR"
+else
+    PREFIX="$HOME/rstudio"
+fi
 PORT=8787
 ADDRESS=127.0.0.1
 WORK="${XDG_DATA_HOME:-$HOME/.local/share}/rstudio-standalone"

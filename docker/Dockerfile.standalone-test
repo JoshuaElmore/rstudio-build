@@ -1,0 +1,42 @@
+#
+# Smoke-tests the standalone (non-root) tarball on a clean Rocky Linux (8/10)
+# image. Unlike Dockerfile.test, nothing here installs an RPM or touches
+# systemd: a normal unprivileged user extracts the .tar.gz into their own $HOME
+# and launches the server via run-standalone.sh.
+#
+# The Makefile builds this from a small context dir containing just the one
+# *-standalone.tar.gz and test-standalone.sh, and passes BASE_IMAGE to match
+# the target OS.
+
+ARG BASE_IMAGE=rockylinux/rockylinux:10
+FROM ${BASE_IMAGE}
+
+# R is needed at runtime. As in Dockerfile.test, install it WITH docs (Rocky's
+# default tsflags=nodocs strips /usr/share/doc/R, which rserver refuses to start
+# without). curl/procps-ng for the smoke probe; shadow-utils to add the user.
+RUN set -eux; \
+    . /etc/os-release; major="${VERSION_ID%%.*}"; \
+    dnf -y install dnf-plugins-core; \
+    if [ "$major" -ge 9 ]; then \
+        dnf config-manager --set-enabled crb || dnf config-manager --enable crb; \
+    else \
+        dnf config-manager --set-enabled powertools || dnf config-manager --enable powertools; \
+    fi; \
+    dnf -y install epel-release; \
+    dnf -y --setopt=tsflags='' install R-core; \
+    dnf -y install procps-ng curl shadow-utils tar gzip findutils; \
+    dnf clean all
+
+# A plain, non-root user with NO sudo. Everything below runs as this user, so a
+# passing test proves the install needs no privileges.
+RUN useradd -m -s /bin/bash tester
+WORKDIR /home/tester
+
+# The build context is the Makefile's staging dir: the one tarball + the test.
+COPY --chown=tester:tester *-standalone.tar.gz /home/tester/rstudio-standalone.tar.gz
+COPY --chown=tester:tester test-standalone.sh /home/tester/test-standalone.sh
+RUN chmod +x /home/tester/test-standalone.sh
+
+USER tester
+EXPOSE 8787
+CMD ["/home/tester/test-standalone.sh"]
