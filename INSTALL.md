@@ -30,39 +30,39 @@ make ... DOCKER=docker
 
 ## 2. Choose the target OS
 
-`ROCKY` selects the build **and** target OS generation (default `10`). Build with
+`EL` selects the build **and** target OS generation (default `10`). Build with
 the value that matches where you'll install, because the binaries link the build
 OS's glibc:
 
 | Target OS family | Build with |
 |------------------|------------|
-| RHEL / Rocky / Alma **8** | `ROCKY=8` |
-| RHEL / Rocky / Alma **10** | `ROCKY=10` |
+| Enterprise Linux **8** (RHEL / AlmaLinux / Oracle / …) | `EL=8` |
+| Enterprise Linux **10** (RHEL / AlmaLinux / Oracle / …) | `EL=10` |
 
 A newer-glibc build will not start on an older target (an EL10 build won't run on
 EL8). When in doubt, build on the **oldest** generation you need to support. The
 CPU arch must also match (`x86_64`). Each OS keeps its own images and output dir
-(`output/rocky8/`, `output/rocky10/`).
+(`output/el8/`, `output/el10/`).
 
 ---
 
 ## 3. Build
 
 ```bash
-make rpm             # -> output/rocky<N>/rstudio-server-<ver>.<el>.<arch>.rpm
-make standalone      # -> output/rocky<N>/rstudio-server-<ver>.<el>.<arch>-standalone.tar.gz
+make rpm             # -> output/el<N>/rstudio-server-<ver>.<el>.<arch>.rpm
+make standalone      # -> output/el<N>/rstudio-server-<ver>.<el>.<arch>-standalone.tar.gz
 make all             # build + smoke-test BOTH (default target)
 ```
 
 Handy aliases and helpers:
 
 ```bash
-make rocky8          # = make all ROCKY=8
-make rocky10         # = make all ROCKY=10
+make el8             # = make all EL=8
+make el10            # = make all EL=10
 make test            # install the RPM on a clean image and smoke-test it
 make test-standalone # extract + run the tarball as a non-root user and smoke-test it
 make shell           # debug shell in the builder image
-make clean           # remove this ROCKY's images + the whole ./output/ tree
+make clean           # remove this EL's images + the whole ./output/ tree
 ```
 
 Build a different tag/version by overriding the version variables:
@@ -74,11 +74,11 @@ make all \
   RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+242
 ```
 
-The artifacts land in `output/rocky<N>/`, e.g.:
+The artifacts land in `output/el<N>/`, e.g.:
 
 ```
-output/rocky10/rstudio-server-2026.06.0-242.el10.x86_64.rpm
-output/rocky10/rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
+output/el10/rstudio-server-2026.06.0-242.el10.x86_64.rpm
+output/el10/rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
 ```
 
 ---
@@ -174,8 +174,8 @@ chosen prefix, so a relocated install starts normally.
 
 Only the build box needs Docker. For no-Docker targets:
 
-1. On the build box: `make standalone ROCKY=<8|10>` (match the target's OS family).
-2. Copy the single `output/rocky<N>/…-standalone.tar.gz` to the target (`scp`,
+1. On the build box: `make standalone EL=<8|10>` (match the target's OS family).
+2. Copy the single `output/el<N>/…-standalone.tar.gz` to the target (`scp`,
    shared filesystem, artifact store, …).
 3. On the target: extract and run `run-standalone.sh` as above.
 
@@ -194,7 +194,7 @@ No root, no rpm database, no systemd, and no Docker are involved on the target.
   under its `db/` subdirectory.
 - **`No such file or directory` for R / wrong R** — pass `--r-bin` explicitly.
 - **Won't start on an older OS** — you built on a newer OS generation; rebuild with
-  the `ROCKY` value that matches (or is older than) the target.
+  the `EL` value that matches (or is older than) the target.
 - **Port already in use** — pick another with `--port`.
 - **First build is very slow / large** — expected; it compiles everything from
   source. Layers are ordered so the heavy dependency layer caches between runs.
