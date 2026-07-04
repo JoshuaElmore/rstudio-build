@@ -1,6 +1,6 @@
 #
-# Smoke-tests the standalone (non-root) tarball on a clean Rocky Linux (8/10)
-# image. Unlike Dockerfile.test, nothing here installs an RPM or touches
+# Smoke-tests the standalone (non-root) tarball on a clean Enterprise Linux
+# (EL 8/10) image. Unlike Dockerfile.test, nothing here installs an RPM or touches
 # systemd: a normal unprivileged user extracts the .tar.gz into their own $HOME
 # and launches the server via run-standalone.sh.
 #
@@ -11,7 +11,7 @@
 ARG BASE_IMAGE=rockylinux/rockylinux:10
 FROM ${BASE_IMAGE}
 
-# R is needed at runtime. As in Dockerfile.test, install it WITH docs (Rocky's
+# R is needed at runtime. As in Dockerfile.test, install it WITH docs (EL's
 # default tsflags=nodocs strips /usr/share/doc/R, which rserver refuses to start
 # without). curl/procps-ng for the smoke probe; shadow-utils to add the user.
 RUN set -eux; \

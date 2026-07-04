@@ -1,10 +1,10 @@
-# Build RStudio Server RPMs on Rocky Linux 8 / 10 (Docker)
+# Build RStudio Server RPMs on Enterprise Linux (EL 8 / 10) with Docker
 
 Compiles [RStudio Server](https://github.com/rstudio/rstudio) from source —
-pinned to tag **`v2026.06.0+242`** — inside a Rocky Linux
+pinned to tag **`v2026.06.0+242`** — inside an Enterprise Linux (EL)
 container, produces an installable, **relocatable RPM** *and* a **non-root
-standalone tarball**, then smoke-tests both on a clean Rocky image. Builds for
-**Rocky Linux 8 or 10** (`ROCKY=8` / `ROCKY=10`).
+standalone tarball**, then smoke-tests both on a clean EL image. Builds for
+**EL 8 or 10** (`EL=8` / `EL=10`).
 
 > **New here?** See **[INSTALL.md](INSTALL.md)** for a step-by-step build +
 > install guide (both the RPM and the no-root tarball).
@@ -14,26 +14,26 @@ standalone tarball**, then smoke-tests both on a clean Rocky image. Builds for
 | File | Purpose |
 |------|---------|
 | `Makefile` | Orchestrates everything (`build → extract → rename → test`). |
-| `docker/Dockerfile.build` | Rocky 8/10 builder: clones the tag, installs deps, builds the RPM. |
-| `docker/Dockerfile.test` | Rocky 8/10 + R: installs the RPM and runs the smoke test. |
-| `docker/Dockerfile.standalone-test` | Rocky 8/10 + R: extracts the standalone tarball **as a non-root user** and smoke-tests it. |
+| `docker/Dockerfile.build` | EL 8/10 builder: clones the tag, installs deps, builds the RPM. |
+| `docker/Dockerfile.test` | EL 8/10 + R: installs the RPM and runs the smoke test. |
+| `docker/Dockerfile.standalone-test` | EL 8/10 + R: extracts the standalone tarball **as a non-root user** and smoke-tests it. |
 | `scripts/build-rpm.sh` | Activates the right toolchain/JDK, runs `package/linux/make-package Server RPM`, makes the RPM relocatable. |
 | `scripts/make-standalone.sh` | Unpacks the relocatable RPM's payload and bundles it + `run-standalone.sh` into a non-root `.tar.gz`. |
 | `scripts/run-standalone.sh` | Launches RStudio Server as an ordinary user — no root, no systemd (state redirected out of `/var` and `/etc`). |
 | `scripts/test-rpm.sh` | Asserts relocatability, runs `verify-installation`, starts `rserver`, curls the login page. |
 | `scripts/test-standalone.sh` | Extracts + runs the standalone tarball as a non-root user, asserts no systemd service, curls the login page. |
-| `output/rocky<N>/` | Extracted, renamed `.rpm` **and `…-standalone.tar.gz`** artifacts land here (per OS). |
+| `output/el<N>/` | Extracted, renamed `.rpm` **and `…-standalone.tar.gz`** artifacts land here (per OS). |
 
 ## Usage (local)
 
 ```bash
-make rpm             # compile + build the RPM, copied to ./output/rocky<N>/
+make rpm             # compile + build the RPM, copied to ./output/el<N>/
 make test            # install the RPM on a clean image and smoke-test it
 make standalone      # build a non-root install tarball (.tar.gz, no rpm/systemd)
 make test-standalone # extract + run that tarball as a normal user and smoke-test it
-make all             # rpm + test (default)
+make all             # build + test BOTH the RPM and the tarball (default)
 make shell           # debug shell in the builder image
-make clean           # remove the current ROCKY's images + the entire ./output/ tree
+make clean           # remove the current EL's images + the entire ./output/ tree
 ```
 
 ## Non-root install (no rpm, no systemd)
@@ -42,7 +42,7 @@ make clean           # remove the current ROCKY's images + the entire ./output/ 
 and runs with no root, no `rpm`, and no systemd service:
 
 ```
-output/rocky10/rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
+output/el10/rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
 ```
 
 It works by unpacking the relocatable RPM's *file payload* (the
@@ -69,32 +69,32 @@ the same single-user approach Open OnDemand uses; state lives under
 
 The build machine needs Docker; the **target does not** — copy the one `.tar.gz`
 to any compatible machine and extract it. Because the binaries link the build
-OS's glibc, build with `ROCKY` matching the target's RHEL family (`ROCKY=8` for
-EL8 targets, `ROCKY=10` for EL10) and a matching CPU arch (`x86_64`).
+OS's glibc, build with `EL` matching the target's EL generation (`EL=8` for
+EL8 targets, `EL=10` for EL10) and a matching CPU arch (`x86_64`).
 
-### Choosing the OS (Rocky 8 or 10)
+### Choosing the OS (EL 8 or 10)
 
-`ROCKY` selects the build/target OS (default `10`):
+`EL` selects the build/target OS (default `10`):
 
 ```bash
-make all ROCKY=10     # Rocky Linux 10  (alias: make rocky10)
-make all ROCKY=8      # Rocky Linux 8   (alias: make rocky8)
+make all EL=10     # EL 10  (alias: make el10)
+make all EL=8      # EL 8   (alias: make el8)
 ```
 
-Each OS keeps its own images, output dir (`output/rocky8/`, `output/rocky10/`)
-and RPM, so the two never clobber each other. On Rocky 8 the build automatically
+Each OS keeps its own images, output dir (`output/el8/`, `output/el10/`)
+and RPM, so the two never clobber each other. On EL 8 the build automatically
 uses the `powertools` repo and a `gcc-toolset` compiler (its system gcc is too
-old), and keeps the EL8 package names; Rocky 10 uses `crb` and the EL10 names.
+old), and keeps the EL8 package names; EL 10 uses `crb` and the EL10 names.
 
 ### RPM naming
 
-The extracted RPM is renamed to encode the **RStudio version** and the **Linux
+The extracted RPM is renamed to encode the **RStudio version** and the **EL
 version**:
 
 ```
-output/rocky10/rstudio-server-2026.06.0-242.el10.x86_64.rpm
-output/rocky8/rstudio-server-2026.06.0-242.el8.x86_64.rpm
-                            └──── version ────┘ └OS┘ └arch┘
+output/el10/rstudio-server-2026.06.0-242.el10.x86_64.rpm
+output/el8/rstudio-server-2026.06.0-242.el8.x86_64.rpm
+                          └──── version ────┘ └OS┘ └arch┘
 ```
 
 ### Build a different tag/version
@@ -109,17 +109,17 @@ make all \
 ## GitHub Actions
 
 `.github/workflows/build-rpm.yml` runs the **exact same** Makefile/Dockerfiles in
-CI, as a matrix over **Rocky 8 and Rocky 10** (one parallel job each). Trigger it
+CI, as a matrix over **EL 8 and EL 10** (one parallel job each). Trigger it
 manually (**Actions → Build RStudio Server RPM → Run workflow**, with optional
 tag/version inputs) or by pushing a `v*` tag. Each matrix leg:
 
 1. frees runner disk space (the build needs several GB),
-2. `make rpm ROCKY=<8|10>` — compiles + builds the relocatable RPM,
-3. `make test ROCKY=<8|10>` — installs it on a clean Rocky image and smoke-tests it,
+2. `make rpm EL=<8|10>` — compiles + builds the relocatable RPM,
+3. `make test EL=<8|10>` — installs it on a clean EL image and smoke-tests it,
 4. uploads the RPM as a per-OS build artifact (and attaches it to the GitHub
    Release on tag pushes).
 
-The two legs use separate GHA cache scopes (`rocky8` / `rocky10`) so they don't
+The two legs use separate GHA cache scopes (`el8` / `el10`) so they don't
 evict each other.
 
 ### Local vs CI parity
@@ -147,7 +147,7 @@ works inside GitHub Actions; omit `BUILD_FLAGS` anywhere else.)
   Node, Quarto, pandoc, soci, …) is heavy — expect a long first build and several
   GB of disk. Layers are ordered so the dependency layer caches between runs.
 - **Package-name deltas:** the upstream Fedora/RHEL dependency list needs a few
-  names patched for current Rocky releases. `Dockerfile.build` patches them before
+  names patched for current EL releases. `Dockerfile.build` patches them before
   running the upstream installer:
   - both EL8 + EL10: `java`→`java-21-openjdk`,
     `java-devel`→`java-21-openjdk-devel`, `postgresql-devel`→`libpq-devel`;
@@ -166,9 +166,10 @@ works inside GitHub Actions; omit `BUILD_FLAGS` anywhere else.)
   relocated install into `/opt`.
 - **R is needed at build time:** `dependencies/common/install-packages` runs R to
   install a few R packages, so the builder installs R + headers.
-- **R doc dir in the test image:** Rocky containers set `tsflags=nodocs`, which
+- **R doc dir in the test image:** EL containers set `tsflags=nodocs`, which
   strips R's `/usr/share/doc/R`; `rserver` refuses to start without it, so the
   test image installs R with `tsflags=''`.
 - **Testing without systemd:** containers usually lack systemd, so the test
   launches `rserver` directly (`--server-daemonize=0`) and verifies it serves
   the sign-in page on port 8787, rather than using `systemctl`.
+```

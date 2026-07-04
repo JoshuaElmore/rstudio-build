@@ -1,7 +1,7 @@
 #
-# Builds RStudio Server from source on Rocky Linux (8 or 10) and produces an
-# RPM. Select the OS with --build-arg BASE_IMAGE=rockylinux/rockylinux:8
-# (the Makefile does this via `make ... ROCKY=8`).
+# Builds RStudio Server from source on Enterprise Linux (EL 8 or 10) and
+# produces an RPM. Select the OS with --build-arg BASE_IMAGE=rockylinux/rockylinux:8
+# (the Makefile does this via `make ... EL=8`).
 #
 # The resulting RPM is left at /output/*.rpm inside the image and can be
 # copied out by the Makefile.
@@ -84,7 +84,7 @@ RUN set -eux; \
 # This is the heaviest, slowest layer; kept separate so it caches well.
 #
 # The upstream (Fedora/RHEL) package list needs a few names patched for current
-# Rocky releases. Patch the list in place before running:
+# EL releases. Patch the list in place before running:
 #   java            -> java-21-openjdk        (unversioned name gone; EL8 + EL10)
 #   java-devel      -> java-21-openjdk-devel
 #   postgresql-devel-> libpq-devel            (client headers split out; EL8+EL10)
