@@ -14,6 +14,11 @@ FROM ${BASE_IMAGE}
 # R is needed at runtime. As in Dockerfile.test, install it WITH docs (EL's
 # default tsflags=nodocs strips /usr/share/doc/R, which rserver refuses to start
 # without). curl/procps-ng for the smoke probe; shadow-utils to add the user.
+# sqlite-libs is required by rserver itself (its SQLite database provider
+# dynamically links libsqlite3.so.0 -- see INSTALL.md's "Requirements on the
+# target"); installed explicitly rather than relying on it arriving
+# transitively, so this test doesn't silently depend on incidental package
+# pulls from crb/epel.
 RUN set -eux; \
     . /etc/os-release; major="${VERSION_ID%%.*}"; \
     dnf -y install dnf-plugins-core; \
@@ -24,7 +29,7 @@ RUN set -eux; \
     fi; \
     dnf -y install epel-release; \
     dnf -y --setopt=tsflags='' install R-core; \
-    dnf -y install procps-ng curl shadow-utils tar gzip findutils; \
+    dnf -y install procps-ng curl shadow-utils tar gzip findutils sqlite-libs; \
     dnf clean all
 
 # A plain, non-root user with NO sudo. Everything below runs as this user, so a

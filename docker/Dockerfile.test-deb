@@ -1,0 +1,37 @@
+#
+# Installs the freshly built RStudio Server .deb on a clean Ubuntu Server LTS
+# (24.04 or 26.04) image, alongside R, and runs a smoke test.
+#
+# The Makefile builds this with a small, OS-specific context dir containing just
+# the right *.deb and test-deb.sh, and passes BASE_IMAGE to match the build OS.
+
+ARG BASE_IMAGE=ubuntu:26.04
+FROM ${BASE_IMAGE}
+ENV DEBIAN_FRONTEND=noninteractive
+
+# NOTE: the official Ubuntu image ships a dpkg path-exclude that strips package
+# docs by default (the apt-get analogue of EL's `tsflags=nodocs`). R's doc dir
+# (/usr/share/doc/R) is one of those, and rserver refuses to start if it is
+# missing ("R doc dir not found"). Remove the exclude before installing R so
+# that directory survives.
+RUN set -eux; \
+    rm -f /etc/dpkg/dpkg.cfg.d/docker /etc/dpkg/dpkg.cfg.d/excludes; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends r-base-core; \
+    apt-get install -y --no-install-recommends procps curl passwd; \
+    rm -rf /var/lib/apt/lists/*
+
+# Build context is the Makefile's OS-specific staging dir: it contains the one
+# correct *.deb plus test-deb.sh.
+COPY *.deb /tmp/
+COPY test-deb.sh /usr/local/bin/test-deb.sh
+RUN chmod +x /usr/local/bin/test-deb.sh
+
+# Install the .deb (apt resolves any runtime deps from its Depends: field).
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y /tmp/rstudio-server*.deb; \
+    rm -rf /var/lib/apt/lists/*
+
+EXPOSE 8787
+CMD ["/usr/local/bin/test-deb.sh"]

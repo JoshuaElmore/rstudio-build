@@ -1,0 +1,135 @@
+#
+# Builds RStudio Server from source on Ubuntu Server LTS (24.04 or 26.04) and
+# produces a .deb. Select the OS with --build-arg BASE_IMAGE=ubuntu:24.04
+# (the Makefile does this via `make ... DISTRO=ubuntu UBUNTU=24.04`).
+#
+# The resulting .deb is left at /output/*.deb inside the image and can be
+# copied out by the Makefile.
+
+ARG BASE_IMAGE=ubuntu:26.04
+FROM ${BASE_IMAGE}
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ---------------------------------------------------------------------------
+# Build arguments (overridable from the Makefile)
+# ---------------------------------------------------------------------------
+ARG RSTUDIO_GIT_URL=https://github.com/rstudio/rstudio.git
+ARG RSTUDIO_GIT_REF=v2026.06.0+242
+ARG RSTUDIO_VERSION_MAJOR=2026
+ARG RSTUDIO_VERSION_MINOR=06
+ARG RSTUDIO_VERSION_PATCH=0
+ARG RSTUDIO_VERSION_SUFFIX=+242
+
+ENV RSTUDIO_VERSION_MAJOR=${RSTUDIO_VERSION_MAJOR} \
+    RSTUDIO_VERSION_MINOR=${RSTUDIO_VERSION_MINOR} \
+    RSTUDIO_VERSION_PATCH=${RSTUDIO_VERSION_PATCH} \
+    RSTUDIO_VERSION_SUFFIX=${RSTUDIO_VERSION_SUFFIX}
+
+# ---------------------------------------------------------------------------
+# Base tooling.
+#
+# Unlike EL8, Ubuntu 24.04/26.04 ship a modern system gcc (13+) that's new
+# enough to build RStudio directly -- no toolset/alternate compiler needed.
+# The official Ubuntu images also strip package docs by default via a dpkg
+# path-exclude in /etc/dpkg/dpkg.cfg.d/ (the apt-get analogue of EL's
+# `tsflags=nodocs`); remove it up front so R's doc dir survives (rserver
+# refuses to start without R's /usr/share/doc/R -- see Dockerfile.test-deb).
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    rm -f /etc/dpkg/dpkg.cfg.d/docker /etc/dpkg/dpkg.cfg.d/excludes; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        git sudo file findutils tar gzip xz-utils unzip \
+        build-essential ninja-build patch \
+        python3 python3-venv \
+        ca-certificates dpkg-dev; \
+    rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# Fetch the exact tag (shallow clone of the single ref)
+# ---------------------------------------------------------------------------
+WORKDIR /src
+RUN set -eux; \
+    git init rstudio; \
+    cd rstudio; \
+    git remote add origin "${RSTUDIO_GIT_URL}"; \
+    git fetch --depth 1 origin "refs/tags/${RSTUDIO_GIT_REF}"; \
+    git checkout FETCH_HEAD; \
+    git log -1 --oneline
+
+# ---------------------------------------------------------------------------
+# R is required at BUILD time: dependencies/common/install-packages runs R to
+# install a small preset of R packages (digest purrr rmarkdown testthat xml2
+# yaml, plus transitive deps like fs) from source. That needs R + its headers,
+# a Fortran compiler, libxml2-dev (for xml2), and libuv1-dev (for fs, which
+# uses libuv for async file watching -- NOT installed by upstream's own
+# install-dependencies-<codename> apt list, so it must be explicit here or the
+# 'fs' package's configure step fails with "Package 'libuv' not found").
+# Ubuntu's own repos provide r-base.
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        r-base-core r-base-dev gfortran libxml2-dev libcurl4-openssl-dev \
+        libuv1-dev pkg-config; \
+    rm -rf /var/lib/apt/lists/*; \
+    R --version | head -1
+
+# ---------------------------------------------------------------------------
+# Install OS + common (node, boost, quarto, pandoc, soci, ...) dependencies.
+# install-dependencies-debian detects the release codename (via `lsb_release
+# -sc`) and delegates to install-dependencies-<codename>, which apt-get
+# installs the OS packages and then calls ../common/install-common to
+# download/compile the bundled dependencies. This is the heaviest, slowest
+# layer; kept separate so it caches well.
+#
+# Compatibility shim for a codename newer than this RStudio tag knows about:
+# at the time this Dockerfile was written, upstream ships named scripts only
+# through Ubuntu 24.04 ("noble"). If our codename has no matching script,
+# clone noble's (same apt package family, closest known-good list) and patch
+# its internal "is this really noble?" guard to accept our codename instead.
+# This is a best-effort shim, not an upstream-verified package list -- if the
+# build fails here, this is the first place to look (a package may have been
+# renamed/split since noble).
+# ---------------------------------------------------------------------------
+WORKDIR /src/rstudio/dependencies/linux
+RUN set -eux; \
+    apt-get update && apt-get install -y --no-install-recommends lsb-release && rm -rf /var/lib/apt/lists/*; \
+    codename="$(. /etc/os-release; echo "$VERSION_CODENAME")"; \
+    script="install-dependencies-${codename}"; \
+    if [ ! -f "$script" ]; then \
+        echo ">> No upstream $script; synthesizing from install-dependencies-noble (compatibility shim, see Dockerfile.build-deb)"; \
+        sed "s/\"noble\"/\"${codename}\"/" install-dependencies-noble > "$script"; \
+        chmod +x "$script"; \
+    fi; \
+    ./install-dependencies-debian
+
+# ---------------------------------------------------------------------------
+# Build the Server .deb.
+# make-package <Target> <Package> -> Server DEB
+# CPack writes the .deb into the build directory under package/linux.
+# ---------------------------------------------------------------------------
+WORKDIR /src/rstudio/package/linux
+COPY scripts/build-deb.sh /usr/local/bin/build-deb.sh
+RUN chmod +x /usr/local/bin/build-deb.sh && /usr/local/bin/build-deb.sh
+
+# Collect the produced .deb(s) in a predictable location.
+RUN set -eux; \
+    mkdir -p /output; \
+    find /src/rstudio/package/linux -name 'rstudio-server*.deb' -exec cp -v {} /output/ \; ; \
+    ls -l /output/*.deb
+
+# ---------------------------------------------------------------------------
+# Standalone (non-root) installer tooling.
+#
+# `make standalone` runs make-standalone.sh in this image to convert the .deb
+# in /output into a plain non-root install tarball (.tar.gz) that a normal
+# user extracts and runs with no root and no systemd service. These scripts
+# are copied LATE (after the heavy build) so editing them never busts the
+# build cache. make-standalone.sh unpacks the .deb payload with `dpkg-deb -x`,
+# which ships with dpkg (already present, no extra package needed).
+# ---------------------------------------------------------------------------
+COPY scripts/run-standalone.sh scripts/make-standalone.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/run-standalone.sh /usr/local/bin/make-standalone.sh
+
+CMD ["/bin/bash", "-c", "ls -l /output/*"]

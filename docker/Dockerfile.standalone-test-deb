@@ -1,0 +1,42 @@
+#
+# Smoke-tests the standalone (non-root) tarball on a clean Ubuntu Server LTS
+# (24.04/26.04) image. Unlike Dockerfile.test-deb, nothing here installs a .deb
+# or touches systemd: a normal unprivileged user extracts the .tar.gz into
+# their own $HOME and launches the server via run-standalone.sh.
+#
+# The Makefile builds this from a small context dir containing just the one
+# *-standalone.tar.gz and test-standalone.sh, and passes BASE_IMAGE to match
+# the target OS.
+
+ARG BASE_IMAGE=ubuntu:26.04
+FROM ${BASE_IMAGE}
+ENV DEBIAN_FRONTEND=noninteractive
+
+# R is needed at runtime. As in Dockerfile.test-deb, remove the docs-stripping
+# dpkg exclude before installing R (rserver refuses to start without
+# /usr/share/doc/R). procps/curl for the smoke probe. libsqlite3-0 is required
+# by rserver itself (its SQLite database provider dynamically links
+# libsqlite3.so.0 -- see INSTALL.md's "Requirements on the target"); it is NOT
+# pulled in transitively by r-base-core on a minimal image, so it must be
+# explicit here or rserver fails to start with "error while loading shared
+# libraries: libsqlite3.so.0".
+RUN set -eux; \
+    rm -f /etc/dpkg/dpkg.cfg.d/docker /etc/dpkg/dpkg.cfg.d/excludes; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        r-base-core libsqlite3-0 procps curl tar gzip findutils; \
+    rm -rf /var/lib/apt/lists/*
+
+# A plain, non-root user with NO sudo. Everything below runs as this user, so a
+# passing test proves the install needs no privileges.
+RUN useradd -m -s /bin/bash tester
+WORKDIR /home/tester
+
+# The build context is the Makefile's staging dir: the one tarball + the test.
+COPY --chown=tester:tester *-standalone.tar.gz /home/tester/rstudio-standalone.tar.gz
+COPY --chown=tester:tester test-standalone.sh /home/tester/test-standalone.sh
+RUN chmod +x /home/tester/test-standalone.sh
+
+USER tester
+EXPOSE 8787
+CMD ["/home/tester/test-standalone.sh"]
