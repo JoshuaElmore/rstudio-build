@@ -5,7 +5,8 @@
       "Read(//tmp/**)",
       "Bash(make -n all)",
       "Bash(python3 -c \"import yaml, sys; yaml.safe_load\\(open\\('.github/workflows/build.yml'\\)\\); print\\('YAML parses OK'\\)\")",
-      "Bash(python -c \"import yaml, sys; yaml.safe_load\\(open\\('.github/workflows/build.yml'\\)\\); print\\('YAML parses OK'\\)\")"
+      "Bash(python -c \"import yaml, sys; yaml.safe_load\\(open\\('.github/workflows/build.yml'\\)\\); print\\('YAML parses OK'\\)\")",
+      "Bash(python -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/build.yml'\\)\\); print\\('YAML parses OK'\\)\")"
     ]
   }
 }

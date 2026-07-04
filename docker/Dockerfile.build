@@ -106,6 +106,16 @@ RUN set -eux; \
         sed -E -i 's/^([[:space:]]*)zlib-devel$/\1zlib-ng-compat-devel/' install-dependencies-yum; \
     fi; \
     if [ -f "/opt/rh/${GCC_TOOLSET}/enable" ]; then . "/opt/rh/${GCC_TOOLSET}/enable"; fi; \
+    # install-dependencies-yum shells out to `sudo` internally, but we're
+    # already root in this build container. On current Rocky base images
+    # real sudo can fail its PAM *account* phase here ("Authentication
+    # service cannot retrieve authentication info" / "a password is
+    # required") because nsswitch/PAM expect systemd-based account lookups
+    # that don't exist without systemd running -- unrelated to actual
+    # credentials. Since root running sudo should be a no-op anyway, replace
+    # it with a plain passthrough for this (and any other) build step.
+    printf '#!/bin/sh\nexec "$@"\n' > /usr/bin/sudo; \
+    chmod +x /usr/bin/sudo; \
     ./install-dependencies-yum
 
 # ---------------------------------------------------------------------------
