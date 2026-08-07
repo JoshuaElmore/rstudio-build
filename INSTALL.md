@@ -83,19 +83,19 @@ Build a different tag/version by overriding the version variables:
 
 ```bash
 make all \
-  RSTUDIO_GIT_REF=v2026.06.0+242 \
-  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=06 \
-  RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+242
+  RSTUDIO_GIT_REF=v2026.07.1+147 \
+  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=07 \
+  RSTUDIO_VERSION_PATCH=1 RSTUDIO_VERSION_SUFFIX=+147
 ```
 
 The artifacts land in `output/<tag>/`, e.g.:
 
 ```
-output/el10/rstudio-server-2026.06.0-242.el10.x86_64.rpm
-output/el10/rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
+output/el10/rstudio-server-2026.07.1-147.el10.x86_64.rpm
+output/el10/rstudio-server-2026.07.1-147.el10.x86_64-standalone.tar.gz
 
-output/ubuntu24.04/rstudio-server_2026.06.0-242-ubuntu24.04_amd64.deb
-output/ubuntu24.04/rstudio-server-2026.06.0-242.ubuntu24.04.x86_64-standalone.tar.gz
+output/ubuntu24.04/rstudio-server_2026.07.1-147-ubuntu24.04_amd64.deb
+output/ubuntu24.04/rstudio-server-2026.07.1-147.ubuntu24.04.x86_64-standalone.tar.gz
 ```
 
 ---
@@ -108,8 +108,8 @@ regardless of which OS family built it.
 
 ```bash
 # On the target machine, as any normal user:
-tar -xzf rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
-cd rstudio-server-2026.06.0-242.el10.x86_64
+tar -xzf rstudio-server-2026.07.1-147.el10.x86_64-standalone.tar.gz
+cd rstudio-server-2026.07.1-147.el10.x86_64
 
 ./run-standalone.sh                       # http://127.0.0.1:8787, no auth (localhost)
 ./run-standalone.sh --password 'secret'   # require logging in as you with a password
@@ -170,7 +170,7 @@ On a target of the matching EL version, install the package as root; `dnf`
 resolves the runtime dependencies (including R):
 
 ```bash
-sudo dnf install ./rstudio-server-2026.06.0-242.el10.x86_64.rpm
+sudo dnf install ./rstudio-server-2026.07.1-147.el10.x86_64.rpm
 sudo systemctl enable --now rstudio-server
 ```
 
@@ -178,7 +178,7 @@ This RPM is built **relocatable** (upstream's is not — see the README for how)
 Install the tree somewhere other than `/usr/lib/rstudio-server`:
 
 ```bash
-sudo rpm -i --prefix /opt/rstudio ./rstudio-server-2026.06.0-242.el10.x86_64.rpm
+sudo rpm -i --prefix /opt/rstudio ./rstudio-server-2026.07.1-147.el10.x86_64.rpm
 ```
 
 The postinst, the systemd unit's `ExecStart`, and the admin wrapper all honor the
@@ -190,7 +190,7 @@ On a target of the matching Ubuntu version, install as root with `apt` (it
 resolves the runtime dependencies from the package's `Depends:`, including R):
 
 ```bash
-sudo apt install ./rstudio-server_2026.06.0-242-ubuntu24.04_amd64.deb
+sudo apt install ./rstudio-server_2026.07.1-147-ubuntu24.04_amd64.deb
 sudo systemctl enable --now rstudio-server
 ```
 

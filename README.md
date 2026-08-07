@@ -1,7 +1,7 @@
 # Build RStudio Server on EL 8/10 or Ubuntu Server LTS 24.04/26.04 with Docker
 
 Compiles [RStudio Server](https://github.com/rstudio/rstudio) from source —
-pinned to tag **`v2026.06.0+242`** — inside a Docker container, produces an
+pinned to tag **`v2026.07.1+147`** — inside a Docker container, produces an
 installable system package (a **relocatable RPM** on Enterprise Linux, or a
 **.deb** on Ubuntu) *and* a **non-root standalone tarball**, then smoke-tests
 both on a clean image of the target OS.
@@ -67,8 +67,8 @@ make all DISTRO=el     EL=8           # -> output/el8/
 and runs with no root, no package manager, and no systemd service:
 
 ```
-output/el10/rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
-output/ubuntu24.04/rstudio-server-2026.06.0-242.ubuntu24.04.x86_64-standalone.tar.gz
+output/el10/rstudio-server-2026.07.1-147.el10.x86_64-standalone.tar.gz
+output/ubuntu24.04/rstudio-server-2026.07.1-147.ubuntu24.04.x86_64-standalone.tar.gz
 ```
 
 It works by unpacking the built package's *file payload* (the
@@ -82,8 +82,8 @@ systemd-free by construction, for either package format.
 
 ```bash
 # On the target machine, as any normal user — extracting IS the install:
-tar -xzf rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
-cd rstudio-server-2026.06.0-242.el10.x86_64
+tar -xzf rstudio-server-2026.07.1-147.el10.x86_64-standalone.tar.gz
+cd rstudio-server-2026.07.1-147.el10.x86_64
 ./run-standalone.sh                    # http://127.0.0.1:8787, no auth
 ./run-standalone.sh --password 'secret'  # require a login
 ./run-standalone.sh --help             # port, binding, R path, …
@@ -127,11 +127,11 @@ The extracted package is renamed to encode the **RStudio version** and the
 **target OS**:
 
 ```
-output/el10/rstudio-server-2026.06.0-242.el10.x86_64.rpm
-output/el8/rstudio-server-2026.06.0-242.el8.x86_64.rpm
+output/el10/rstudio-server-2026.07.1-147.el10.x86_64.rpm
+output/el8/rstudio-server-2026.07.1-147.el8.x86_64.rpm
                           └──── version ────┘ └OS┘ └arch┘
 
-output/ubuntu24.04/rstudio-server_2026.06.0-242-ubuntu24.04_amd64.deb
+output/ubuntu24.04/rstudio-server_2026.07.1-147-ubuntu24.04_amd64.deb
                                  └──── version ────┘  └────OS────┘ └arch┘
 ```
 
@@ -142,9 +142,9 @@ output/ubuntu24.04/rstudio-server_2026.06.0-242-ubuntu24.04_amd64.deb
 
 ```bash
 make all \
-  RSTUDIO_GIT_REF=v2026.06.0+242 \
-  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=06 \
-  RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+242
+  RSTUDIO_GIT_REF=v2026.07.1+147 \
+  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=07 \
+  RSTUDIO_VERSION_PATCH=1 RSTUDIO_VERSION_SUFFIX=+147
 ```
 
 ## GitHub Actions

@@ -38,9 +38,9 @@
 # 26.04 build hits a package-name error.
 #
 # Override the target tag/version on the command line, e.g.:
-#   make rpm RSTUDIO_GIT_REF=v2026.06.0+242 \
-#            RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=06 \
-#            RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+242
+#   make rpm RSTUDIO_GIT_REF=v2026.07.1+147 \
+#            RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=07 \
+#            RSTUDIO_VERSION_PATCH=1 RSTUDIO_VERSION_SUFFIX=+147
 # =============================================================================
 
 # ---- Configuration ----------------------------------------------------------
@@ -73,11 +73,11 @@ else
 endif
 
 RSTUDIO_GIT_URL        ?= https://github.com/rstudio/rstudio.git
-RSTUDIO_GIT_REF        ?= v2026.06.0+242
+RSTUDIO_GIT_REF        ?= v2026.07.1+147
 RSTUDIO_VERSION_MAJOR  ?= 2026
-RSTUDIO_VERSION_MINOR  ?= 06
-RSTUDIO_VERSION_PATCH  ?= 0
-RSTUDIO_VERSION_SUFFIX ?= +242
+RSTUDIO_VERSION_MINOR  ?= 07
+RSTUDIO_VERSION_PATCH  ?= 1
+RSTUDIO_VERSION_SUFFIX ?= +147
 
 # This host's user is not in the docker group but has passwordless `sudo docker`.
 # Override with `make DOCKER=docker` if your user can talk to the daemon directly.
@@ -92,7 +92,7 @@ BUILD_FLAGS   ?=
 # ubuntu26.04 builds never clobber each other (CPack names the package file
 # identically regardless of target OS).
 VER           := $(RSTUDIO_VERSION_MAJOR).$(RSTUDIO_VERSION_MINOR).$(RSTUDIO_VERSION_PATCH)
-# Build number from the version suffix ("+242" -> "242").
+# Build number from the version suffix ("+147" -> "147").
 RSTUDIO_BUILD := $(subst +,,$(RSTUDIO_VERSION_SUFFIX))
 # Two different arch-naming conventions: rpm/tarball use "x86_64" (rpm --eval
 # %_arch); .deb uses "amd64" (dpkg --print-architecture). Same physical arch.
@@ -104,17 +104,17 @@ SA_TEST_IMAGE ?= rstudio-server-standalone-test:$(VER)-$(OS_TAG)
 OUTPUT_ROOT   ?= output
 OUTPUT_DIR    ?= $(OUTPUT_ROOT)/$(OS_TAG)
 # Canonical RPM filename: RStudio version + build, the target OS, and arch.
-# e.g. rstudio-server-2026.06.0-242.el8.x86_64.rpm
+# e.g. rstudio-server-2026.07.1-147.el8.x86_64.rpm
 RPM_FILENAME  ?= rstudio-server-$(VER)-$(RSTUDIO_BUILD).el$(EL).$(ARCH).rpm
 # Canonical DEB filename, following Debian's name_version_arch.deb convention.
-# e.g. rstudio-server_2026.06.0-242-ubuntu24.04_amd64.deb
+# e.g. rstudio-server_2026.07.1-147-ubuntu24.04_amd64.deb
 DEB_FILENAME  ?= rstudio-server_$(VER)-$(RSTUDIO_BUILD)-ubuntu$(UBUNTU)_$(DEB_ARCH).deb
 # Standalone tarball filename. MUST match the name make-standalone.sh derives
 # inside the container (version + build + OS tag + arch), so the Makefile can
 # copy exactly that file out. Uses the rpm-style ARCH regardless of DISTRO
 # since the tarball is neither an rpm nor a deb. e.g.
-# rstudio-server-2026.06.0-242.el10.x86_64-standalone.tar.gz
-# rstudio-server-2026.06.0-242.ubuntu24.04.x86_64-standalone.tar.gz
+# rstudio-server-2026.07.1-147.el10.x86_64-standalone.tar.gz
+# rstudio-server-2026.07.1-147.ubuntu24.04.x86_64-standalone.tar.gz
 STANDALONE_FILENAME ?= rstudio-server-$(VER)-$(RSTUDIO_BUILD).$(OS_TAG).$(ARCH)-standalone.tar.gz
 
 # Pass docker build args from the configuration above.
