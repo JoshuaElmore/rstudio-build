@@ -217,6 +217,15 @@ Only the build box needs Docker. For no-Docker targets:
 
 No root, no package database, no systemd, and no Docker are involved on the target.
 
+### Optional: expose it via `module load`
+
+For HPC login nodes that use [Lmod](https://lmod.readthedocs.io/) or
+[Environment Modules](https://modules.readthedocs.io/), example modulefiles
+(`.lua` and Tcl) that put a `rserver-standalone` command on `$PATH` after
+extracting the tarball are in [`modulefiles/`](modulefiles/README.md).
+They're examples to adapt (they hardcode a `prefix` you must edit), not
+something `make` generates or installs.
+
 ---
 
 ## Troubleshooting

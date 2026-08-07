@@ -1,0 +1,60 @@
+#%Module1.0
+##
+## rstudio-server/2026.07.1-147 -- Tcl modulefile (environment-modules /
+## Lmod's Tcl-compat mode) for the standalone (non-root, no systemd)
+## RStudio Server tarball built by this repo (`make standalone`).
+## See ../README.md. Functionally equivalent to the .lua sibling file --
+## use whichever your module system reads.
+##
+## Edit `prefix` below to wherever you extracted the …-standalone.tar.gz on
+## THIS host (it must match the host's OS/arch the tarball was built for).
+##
+
+proc ModulesHelp { } {
+    puts stderr "\tRStudio Server 2026.07.1-147 -- standalone, non-root, no-systemd install."
+    puts stderr ""
+    puts stderr "\tLoading this module puts a 'rserver-standalone' command on your PATH; it"
+    puts stderr "\twraps the extracted tarball's run-standalone.sh launcher and runs a"
+    puts stderr "\tsingle-user RStudio Server session in the foreground, with all writable"
+    puts stderr "\tstate kept under ~/.local/share/rstudio-standalone."
+    puts stderr ""
+    puts stderr "\tUsage:"
+    puts stderr "\t  rserver-standalone                      # http://127.0.0.1:8787, no auth"
+    puts stderr "\t  rserver-standalone --password 'secret'  # require a login"
+    puts stderr "\t  rserver-standalone --port 8888 --r-bin /opt/R/4.4.1/bin/R"
+    puts stderr "\t  rserver-standalone --help               # all options"
+    puts stderr ""
+    puts stderr "\tRequires an R on \$PATH (or pass --r-bin). Stop with Ctrl-C."
+}
+
+module-whatis "RStudio Server 2026.07.1-147, standalone non-root/no-systemd install (https://github.com/rstudio/rstudio)"
+
+# Site-specific: where the …-standalone.tar.gz was extracted on this host.
+# Matches $BASE from scripts/make-standalone.sh, e.g.
+#   /opt/apps/rstudio-server/2026.07.1-147/rstudio-server-2026.07.1-147.el10.x86_64
+set prefix /opt/apps/rstudio-server/2026.07.1-147
+
+if { ![file isdirectory $prefix] } {
+    puts stderr "rstudio-server/2026.07.1-147: install prefix not found:"
+    puts stderr "    $prefix"
+    puts stderr "Extract the standalone tarball there (tar -xzf …-standalone.tar.gz),"
+    puts stderr "or edit the 'prefix' variable in this modulefile."
+    exit 1
+}
+
+if { ![file exists "$prefix/run-standalone.sh"] } {
+    puts stderr "rstudio-server/2026.07.1-147: $prefix does not look like an extracted standalone tarball (no run-standalone.sh)."
+    exit 1
+}
+
+setenv       RSTUDIO_PREFIX $prefix
+prepend-path PATH           $prefix/bin
+
+# run-standalone.sh lives at the top of the extracted tree, not in bin/, so
+# expose it as a stable PATH command instead of requiring users to know the
+# tree layout or cd into it.
+set-alias rserver-standalone "$prefix/run-standalone.sh"
+
+if { [module-info mode load] } {
+    puts stderr "rstudio-server/2026.07.1-147 loaded -- run 'rserver-standalone --help' to start a session."
+}
