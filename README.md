@@ -36,6 +36,7 @@ Two OS families, selected with `DISTRO`:
 | `scripts/test-deb.sh` | Same checks minus relocatability (not applicable to .deb). |
 | `scripts/test-standalone.sh` | Extracts + runs the standalone tarball as a non-root user, asserts no systemd service, curls the login page. Identical for both OS families. |
 | `output/<tag>/` | Extracted, renamed package **and `…-standalone.tar.gz`** artifacts land here, where `<tag>` is `el8`/`el10`/`ubuntu24.04`/`ubuntu26.04`. |
+| `modulefiles/` | Optional example Lmod (`.lua`) and Environment Modules (Tcl) modulefiles for `module load`-ing the standalone tarball on HPC login nodes. Not used by `make`; see `modulefiles/README.md`. |
 
 ## Usage (local)
 
