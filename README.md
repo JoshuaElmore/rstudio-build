@@ -22,6 +22,7 @@ Two OS families, selected with `DISTRO`:
 |------|---------|
 | `Makefile` | Orchestrates everything (`build → extract → rename → test`) for both OS families. |
 | `.github/workflows/build.yml` | CI: runs the same Makefile as a 4-way matrix (EL 8/10, Ubuntu 24.04/26.04), uploads artifacts, publishes to GitHub Releases on tag push. |
+| `.github/SECURITY.md` | Security policy — how to report a vulnerability in this build harness vs. in RStudio Server itself. |
 | `docker/Dockerfile.build` | EL 8/10 builder: clones the tag, installs deps, builds the RPM. |
 | `docker/Dockerfile.build-deb` | Ubuntu 24.04/26.04 builder: clones the tag, installs deps, builds the .deb. |
 | `docker/Dockerfile.test` | EL 8/10 + R: installs the RPM and runs the smoke test. |
