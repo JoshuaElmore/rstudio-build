@@ -20,19 +20,19 @@ on:
     inputs:
       rstudio_ref:
         description: "RStudio git tag/ref to build"
-        default: "v2026.06.0+242"
+        default: "v2026.07.1+147"
       version_major:
         description: "RSTUDIO_VERSION_MAJOR"
         default: "2026"
       version_minor:
         description: "RSTUDIO_VERSION_MINOR"
-        default: "06"
+        default: "07"
       version_patch:
         description: "RSTUDIO_VERSION_PATCH"
-        default: "0"
+        default: "1"
       version_suffix:
         description: "RSTUDIO_VERSION_SUFFIX"
-        default: "+242"
+        default: "+147"
   push:
     tags:
       - "v*"
@@ -93,12 +93,12 @@ jobs:
         --cache-to type=gha,mode=max,scope=${{ matrix.tag }}
         --load
       # Build parameters: workflow_dispatch inputs win; otherwise fall back to
-      # the Makefile's own defaults (the pinned v2026.06.0+242).
-      RSTUDIO_GIT_REF: ${{ github.event.inputs.rstudio_ref || 'v2026.06.0+242' }}
+      # the Makefile's own defaults (the pinned v2026.07.1+147).
+      RSTUDIO_GIT_REF: ${{ github.event.inputs.rstudio_ref || 'v2026.07.1+147' }}
       RSTUDIO_VERSION_MAJOR: ${{ github.event.inputs.version_major || '2026' }}
-      RSTUDIO_VERSION_MINOR: ${{ github.event.inputs.version_minor || '06' }}
-      RSTUDIO_VERSION_PATCH: ${{ github.event.inputs.version_patch || '0' }}
-      RSTUDIO_VERSION_SUFFIX: ${{ github.event.inputs.version_suffix || '+242' }}
+      RSTUDIO_VERSION_MINOR: ${{ github.event.inputs.version_minor || '07' }}
+      RSTUDIO_VERSION_PATCH: ${{ github.event.inputs.version_patch || '1' }}
+      RSTUDIO_VERSION_SUFFIX: ${{ github.event.inputs.version_suffix || '+147' }}
 
     steps:
       - name: Checkout
