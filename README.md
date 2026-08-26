@@ -167,15 +167,41 @@ matrix leg:
 5. `make test-standalone` — extracts + runs it as an unprivileged user and
    smoke-tests it,
 6. uploads **two** build artifacts per leg (the system package, and the
-   standalone tarball), and attaches both to the GitHub Release on tag pushes.
+   standalone tarball).
 
 The four legs use separate GHA cache scopes (`el8` / `el10` / `ubuntu24.04` /
 `ubuntu26.04`) so they don't evict each other.
 
-Pushing a `v*` tag creates/updates a GitHub Release for that tag with all 8
-files attached (4 targets × 2 artifacts). This publishes to GitHub Releases
-only — it does **not** push to an apt/yum package repository, which would need
-its own hosting and signing-key setup.
+### Releasing
+
+Pushing a `v*` tag builds all four targets and then, in a separate `release`
+job, creates a GitHub Release for that tag with all 8 files attached
+(4 targets × 2 artifacts):
+
+```bash
+git tag v2026.08.2+200
+git push origin v2026.08.2+200
+```
+
+Two things follow from the tag name, so it has to be right:
+
+- **The tag drives the version.** A `prepare` job parses `v2026.08.2+200` into
+  `RSTUDIO_GIT_REF=v2026.08.2+200` plus `RSTUDIO_VERSION_MAJOR=2026`,
+  `MINOR=08`, `PATCH=2`, `SUFFIX=+200`, and every matrix leg builds from those.
+  Release tags therefore mirror the upstream RStudio tag being built, and the
+  packages in a release always match the tag that produced them. A tag that
+  doesn't parse (`vnightly`, `v2026.08`) fails the run immediately instead of
+  publishing packages labelled with the Makefile's pinned default version.
+- **Publishing happens once, after all four legs pass.** The `release` job
+  `needs:` the whole matrix, so a release never contains a partial set of
+  packages, and only that job holds `contents: write` — the rest of the
+  workflow runs read-only.
+
+Manual (`workflow_dispatch`) runs use the version inputs instead of a tag and
+upload build artifacts only; they never touch Releases.
+
+This publishes to GitHub Releases only — it does **not** push to an apt/yum
+package repository, which would need its own hosting and signing-key setup.
 
 ### Local vs CI parity
 
