@@ -201,6 +201,12 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          # Skip the post-job builder teardown. This runner is ephemeral, so
+          # the builder dies with the VM regardless -- and deleting the
+          # multi-GB BuildKit state volume was timing out ("context deadline
+          # exceeded"), failing `docker buildx rm` and warning the job.
+          cleanup: false
 
       - name: Build the system package (${{ matrix.tag }})
         run: |
@@ -250,7 +256,7 @@ jobs:
         run: ls -l output/${{ matrix.tag }}/
 
       - name: Upload system package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rstudio-server-${{ matrix.pkg_build }}-${{ matrix.tag }}-${{ needs.prepare.outputs.version }}
           path: |
@@ -260,7 +266,7 @@ jobs:
           retention-days: 14
 
       - name: Upload standalone tarball artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rstudio-server-standalone-${{ matrix.tag }}-${{ needs.prepare.outputs.version }}
           path: output/${{ matrix.tag }}/*-standalone.tar.gz
@@ -279,7 +285,7 @@ jobs:
       contents: write
     steps:
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: rstudio-server-*
@@ -289,7 +295,7 @@ jobs:
         run: ls -l dist/
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: RStudio Server ${{ needs.prepare.outputs.version }}${{ needs.prepare.outputs.suffix }}
           files: dist/*
