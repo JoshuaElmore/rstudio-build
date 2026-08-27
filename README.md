@@ -1,7 +1,7 @@
 # Build RStudio Server on EL 8/10 or Ubuntu Server LTS 24.04/26.04 with Docker
 
 Compiles [RStudio Server](https://github.com/rstudio/rstudio) from source —
-pinned to tag **`v2026.07.1+147`** — inside a Docker container, produces an
+pinned to tag **`v2026.08.2+200`** — inside a Docker container, produces an
 installable system package (a **relocatable RPM** on Enterprise Linux, or a
 **.deb** on Ubuntu) *and* a **non-root standalone tarball**, then smoke-tests
 both on a clean image of the target OS.
@@ -69,8 +69,8 @@ make all DISTRO=el     EL=8           # -> output/el8/
 and runs with no root, no package manager, and no systemd service:
 
 ```
-output/el10/rstudio-server-2026.07.1-147.el10.x86_64-standalone.tar.gz
-output/ubuntu24.04/rstudio-server-2026.07.1-147.ubuntu24.04.x86_64-standalone.tar.gz
+output/el10/rstudio-server-2026.08.2-200.el10.x86_64-standalone.tar.gz
+output/ubuntu24.04/rstudio-server-2026.08.2-200.ubuntu24.04.x86_64-standalone.tar.gz
 ```
 
 It works by unpacking the built package's *file payload* (the
@@ -84,8 +84,8 @@ systemd-free by construction, for either package format.
 
 ```bash
 # On the target machine, as any normal user — extracting IS the install:
-tar -xzf rstudio-server-2026.07.1-147.el10.x86_64-standalone.tar.gz
-cd rstudio-server-2026.07.1-147.el10.x86_64
+tar -xzf rstudio-server-2026.08.2-200.el10.x86_64-standalone.tar.gz
+cd rstudio-server-2026.08.2-200.el10.x86_64
 ./run-standalone.sh                    # http://127.0.0.1:8787, no auth
 ./run-standalone.sh --password 'secret'  # require a login
 ./run-standalone.sh --help             # port, binding, R path, …
@@ -129,11 +129,11 @@ The extracted package is renamed to encode the **RStudio version** and the
 **target OS**:
 
 ```
-output/el10/rstudio-server-2026.07.1-147.el10.x86_64.rpm
-output/el8/rstudio-server-2026.07.1-147.el8.x86_64.rpm
+output/el10/rstudio-server-2026.08.2-200.el10.x86_64.rpm
+output/el8/rstudio-server-2026.08.2-200.el8.x86_64.rpm
                           └──── version ────┘ └OS┘ └arch┘
 
-output/ubuntu24.04/rstudio-server_2026.07.1-147-ubuntu24.04_amd64.deb
+output/ubuntu24.04/rstudio-server_2026.08.2-200-ubuntu24.04_amd64.deb
                                  └──── version ────┘  └────OS────┘ └arch┘
 ```
 
@@ -144,9 +144,9 @@ output/ubuntu24.04/rstudio-server_2026.07.1-147-ubuntu24.04_amd64.deb
 
 ```bash
 make all \
-  RSTUDIO_GIT_REF=v2026.07.1+147 \
-  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=07 \
-  RSTUDIO_VERSION_PATCH=1 RSTUDIO_VERSION_SUFFIX=+147
+  RSTUDIO_GIT_REF=v2026.08.2+200 \
+  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=08 \
+  RSTUDIO_VERSION_PATCH=2 RSTUDIO_VERSION_SUFFIX=+200
 ```
 
 ## GitHub Actions
@@ -167,15 +167,41 @@ matrix leg:
 5. `make test-standalone` — extracts + runs it as an unprivileged user and
    smoke-tests it,
 6. uploads **two** build artifacts per leg (the system package, and the
-   standalone tarball), and attaches both to the GitHub Release on tag pushes.
+   standalone tarball).
 
 The four legs use separate GHA cache scopes (`el8` / `el10` / `ubuntu24.04` /
 `ubuntu26.04`) so they don't evict each other.
 
-Pushing a `v*` tag creates/updates a GitHub Release for that tag with all 8
-files attached (4 targets × 2 artifacts). This publishes to GitHub Releases
-only — it does **not** push to an apt/yum package repository, which would need
-its own hosting and signing-key setup.
+### Releasing
+
+Pushing a `v*` tag builds all four targets and then, in a separate `release`
+job, creates a GitHub Release for that tag with all 8 files attached
+(4 targets × 2 artifacts):
+
+```bash
+git tag v2026.08.2+200
+git push origin v2026.08.2+200
+```
+
+Two things follow from the tag name, so it has to be right:
+
+- **The tag drives the version.** A `prepare` job parses `v2026.08.2+200` into
+  `RSTUDIO_GIT_REF=v2026.08.2+200` plus `RSTUDIO_VERSION_MAJOR=2026`,
+  `MINOR=08`, `PATCH=2`, `SUFFIX=+200`, and every matrix leg builds from those.
+  Release tags therefore mirror the upstream RStudio tag being built, and the
+  packages in a release always match the tag that produced them. A tag that
+  doesn't parse (`vnightly`, `v2026.08`) fails the run immediately instead of
+  publishing packages labelled with the Makefile's pinned default version.
+- **Publishing happens once, after all four legs pass.** The `release` job
+  `needs:` the whole matrix, so a release never contains a partial set of
+  packages, and only that job holds `contents: write` — the rest of the
+  workflow runs read-only.
+
+Manual (`workflow_dispatch`) runs use the version inputs instead of a tag and
+upload build artifacts only; they never touch Releases.
+
+This publishes to GitHub Releases only — it does **not** push to an apt/yum
+package repository, which would need its own hosting and signing-key setup.
 
 ### Local vs CI parity
 

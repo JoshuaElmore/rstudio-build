@@ -10,32 +10,44 @@ name: Build, test, and publish RStudio Server packages
 # DOCKER_BUILD / BUILD_FLAGS hooks. Locally those default to plain
 # `sudo docker build`, so `make all` behaves identically on a workstation.
 #
-# Artifacts are uploaded as GitHub Actions build artifacts on every run, and
-# additionally attached to a GitHub Release on tag pushes ("v*"). This does
-# NOT publish to an apt/yum package repository -- that's a separate, larger
-# undertaking (hosting, signing keys, repo metadata) not covered here.
+# Artifacts are uploaded as GitHub Actions build artifacts on every run. On a
+# tag push ("v*") the `release` job additionally attaches every OS family's
+# artifacts to a single GitHub Release -- once, after all four legs are green.
+# This does NOT publish to an apt/yum package repository -- that's a separate,
+# larger undertaking (hosting, signing keys, repo metadata) not covered here.
+#
+# Tag convention: this repo's release tags mirror the upstream RStudio tag they
+# build, e.g. `v2026.08.2+200`. The `prepare` job parses the pushed tag into
+# RSTUDIO_GIT_REF + RSTUDIO_VERSION_{MAJOR,MINOR,PATCH,SUFFIX}, so the packages
+# a release contains always match the tag that produced them. A tag that
+# doesn't parse fails the run early rather than silently publishing packages
+# labelled with the Makefile's pinned default version.
 
 on:
   workflow_dispatch:
     inputs:
       rstudio_ref:
         description: "RStudio git tag/ref to build"
-        default: "v2026.07.1+147"
+        default: "v2026.08.2+200"
       version_major:
         description: "RSTUDIO_VERSION_MAJOR"
         default: "2026"
       version_minor:
         description: "RSTUDIO_VERSION_MINOR"
-        default: "07"
+        default: "08"
       version_patch:
         description: "RSTUDIO_VERSION_PATCH"
-        default: "1"
+        default: "2"
       version_suffix:
         description: "RSTUDIO_VERSION_SUFFIX"
-        default: "+147"
+        default: "+200"
   push:
     tags:
       - "v*"
+
+# Read-only by default; only the `release` job opts up to `contents: write`.
+permissions:
+  contents: read
 
 # Avoid stacking expensive builds on the same ref.
 concurrency:
@@ -43,7 +55,82 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ---- 0. Work out what version we are building -----------------------------
+  # On workflow_dispatch, the inputs win. On a tag push there are no inputs, so
+  # the version is derived from the tag name itself (see "Tag convention"
+  # above). Resolved once here rather than in each matrix leg so the build legs
+  # and the release job cannot disagree about what they are building.
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      rstudio_ref: ${{ steps.v.outputs.rstudio_ref }}
+      major: ${{ steps.v.outputs.major }}
+      minor: ${{ steps.v.outputs.minor }}
+      patch: ${{ steps.v.outputs.patch }}
+      suffix: ${{ steps.v.outputs.suffix }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - name: Resolve build version
+        id: v
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TAG_NAME: ${{ github.ref_name }}
+          IN_REF: ${{ github.event.inputs.rstudio_ref }}
+          IN_MAJOR: ${{ github.event.inputs.version_major }}
+          IN_MINOR: ${{ github.event.inputs.version_minor }}
+          IN_PATCH: ${{ github.event.inputs.version_patch }}
+          IN_SUFFIX: ${{ github.event.inputs.version_suffix }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            ref="$IN_REF"; major="$IN_MAJOR"; minor="$IN_MINOR"
+            patch="$IN_PATCH"; suffix="$IN_SUFFIX"
+          else
+            # Tag push: "v2026.08.2+200" -> ref=v2026.08.2+200, 2026 / 08 / 2 / +200
+            ref="$TAG_NAME"
+            rest="${TAG_NAME#v}"
+            suffix=""
+            case "$rest" in
+              *+*) suffix="+${rest#*+}"; rest="${rest%%+*}" ;;
+            esac
+            # Reject anything that isn't exactly major.minor.patch before
+            # splitting, so e.g. "v2026.08" can't quietly yield patch=08.
+            if ! printf '%s' "$rest" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Cannot parse a version out of '$TAG_NAME'. Expected a tag like v2026.08.2+200."
+              exit 1
+            fi
+            major="${rest%%.*}"; rest="${rest#*.}"
+            minor="${rest%%.*}"; patch="${rest#*.}"
+          fi
+
+          # Refuse to build (and later publish) anything we could not parse
+          # into the exact fields the Makefile expects. The suffix is the
+          # upstream build number ("+200"); the Makefile turns it into the
+          # package release field, so it must be empty or +<digits>.
+          if ! printf '%s' "$major.$minor.$patch" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version '$major.$minor.$patch' is not major.minor.patch."
+            exit 1
+          fi
+          if [ -n "$suffix" ] && ! printf '%s' "$suffix" | grep -Eq '^\+[0-9]+$'; then
+            echo "::error::Version suffix '$suffix' is not a build number like +200."
+            exit 1
+          fi
+
+          {
+            echo "rstudio_ref=$ref"
+            echo "major=$major"
+            echo "minor=$minor"
+            echo "patch=$patch"
+            echo "suffix=$suffix"
+            echo "version=$major.$minor.$patch"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Building RStudio $major.$minor.$patch$suffix from ref $ref"
+
+  # ---- 1. Compile, package, and smoke-test, once per target OS --------------
   build:
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
@@ -92,13 +179,12 @@ jobs:
         --cache-from type=gha,scope=${{ matrix.tag }}
         --cache-to type=gha,mode=max,scope=${{ matrix.tag }}
         --load
-      # Build parameters: workflow_dispatch inputs win; otherwise fall back to
-      # the Makefile's own defaults (the pinned v2026.07.1+147).
-      RSTUDIO_GIT_REF: ${{ github.event.inputs.rstudio_ref || 'v2026.07.1+147' }}
-      RSTUDIO_VERSION_MAJOR: ${{ github.event.inputs.version_major || '2026' }}
-      RSTUDIO_VERSION_MINOR: ${{ github.event.inputs.version_minor || '07' }}
-      RSTUDIO_VERSION_PATCH: ${{ github.event.inputs.version_patch || '1' }}
-      RSTUDIO_VERSION_SUFFIX: ${{ github.event.inputs.version_suffix || '+147' }}
+      # Build parameters, resolved once by the `prepare` job above.
+      RSTUDIO_GIT_REF: ${{ needs.prepare.outputs.rstudio_ref }}
+      RSTUDIO_VERSION_MAJOR: ${{ needs.prepare.outputs.major }}
+      RSTUDIO_VERSION_MINOR: ${{ needs.prepare.outputs.minor }}
+      RSTUDIO_VERSION_PATCH: ${{ needs.prepare.outputs.patch }}
+      RSTUDIO_VERSION_SUFFIX: ${{ needs.prepare.outputs.suffix }}
 
     steps:
       - name: Checkout
@@ -115,6 +201,12 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          # Skip the post-job builder teardown. This runner is ephemeral, so
+          # the builder dies with the VM regardless -- and deleting the
+          # multi-GB BuildKit state volume was timing out ("context deadline
+          # exceeded"), failing `docker buildx rm` and warning the job.
+          cleanup: false
 
       - name: Build the system package (${{ matrix.tag }})
         run: |
@@ -164,9 +256,9 @@ jobs:
         run: ls -l output/${{ matrix.tag }}/
 
       - name: Upload system package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: rstudio-server-${{ matrix.pkg_build }}-${{ matrix.tag }}-${{ env.RSTUDIO_VERSION_MAJOR }}.${{ env.RSTUDIO_VERSION_MINOR }}.${{ env.RSTUDIO_VERSION_PATCH }}
+          name: rstudio-server-${{ matrix.pkg_build }}-${{ matrix.tag }}-${{ needs.prepare.outputs.version }}
           path: |
             output/${{ matrix.tag }}/*.rpm
             output/${{ matrix.tag }}/*.deb
@@ -174,15 +266,38 @@ jobs:
           retention-days: 14
 
       - name: Upload standalone tarball artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: rstudio-server-standalone-${{ matrix.tag }}-${{ env.RSTUDIO_VERSION_MAJOR }}.${{ env.RSTUDIO_VERSION_MINOR }}.${{ env.RSTUDIO_VERSION_PATCH }}
+          name: rstudio-server-standalone-${{ matrix.tag }}-${{ needs.prepare.outputs.version }}
           path: output/${{ matrix.tag }}/*-standalone.tar.gz
           if-no-files-found: error
           retention-days: 14
 
-      - name: Attach artifacts to GitHub Release (tag pushes only)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+  # ---- 2. Publish one release with every OS's artifacts ---------------------
+  # Runs only for tag pushes, and only once every build leg has passed -- so a
+  # release never contains a partial set of packages. This is also the only job
+  # granted write access to the repository.
+  release:
+    needs: [prepare, build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v8
         with:
-          files: output/${{ matrix.tag }}/*
+          path: dist
+          pattern: rstudio-server-*
+          merge-multiple: true
+
+      - name: List release payload
+        run: ls -l dist/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: RStudio Server ${{ needs.prepare.outputs.version }}${{ needs.prepare.outputs.suffix }}
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
