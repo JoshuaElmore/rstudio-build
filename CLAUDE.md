@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repo does **not** contain RStudio Server source. It's a Docker-based build
 harness that clones a pinned tag of [rstudio/rstudio](https://github.com/rstudio/rstudio)
-(currently `v2026.08.2+200`, set via `RSTUDIO_GIT_REF` in the `Makefile`) and
+(currently `v2026.09.0+174`, set via `RSTUDIO_GIT_REF` in the `Makefile`) and
 compiles it from scratch inside Docker, for two OS families:
 
 - **EL** (Enterprise Linux 8/10, on Rocky Linux base images) → relocatable `.rpm`
@@ -51,9 +51,9 @@ make all DISTRO=ubuntu UBUNTU=26.04    # or: make ubuntu26.04  (UBUNTU default)
 Build a different RStudio tag/version:
 
 ```bash
-make all RSTUDIO_GIT_REF=v2026.08.2+200 \
-  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=08 \
-  RSTUDIO_VERSION_PATCH=2 RSTUDIO_VERSION_SUFFIX=+200
+make all RSTUDIO_GIT_REF=v2026.09.0+174 \
+  RSTUDIO_VERSION_MAJOR=2026 RSTUDIO_VERSION_MINOR=09 \
+  RSTUDIO_VERSION_PATCH=0 RSTUDIO_VERSION_SUFFIX=+174
 ```
 
 Docker invocation: the Makefile defaults to `sudo docker` (`DOCKER=sudo docker`)

@@ -17,7 +17,7 @@ name: Build, test, and publish RStudio Server packages
 # larger undertaking (hosting, signing keys, repo metadata) not covered here.
 #
 # Tag convention: this repo's release tags mirror the upstream RStudio tag they
-# build, e.g. `v2026.08.2+200`. The `prepare` job parses the pushed tag into
+# build, e.g. `v2026.09.0+174`. The `prepare` job parses the pushed tag into
 # RSTUDIO_GIT_REF + RSTUDIO_VERSION_{MAJOR,MINOR,PATCH,SUFFIX}, so the packages
 # a release contains always match the tag that produced them. A tag that
 # doesn't parse fails the run early rather than silently publishing packages
@@ -28,19 +28,19 @@ on:
     inputs:
       rstudio_ref:
         description: "RStudio git tag/ref to build"
-        default: "v2026.08.2+200"
+        default: "v2026.09.0+174"
       version_major:
         description: "RSTUDIO_VERSION_MAJOR"
         default: "2026"
       version_minor:
         description: "RSTUDIO_VERSION_MINOR"
-        default: "08"
+        default: "09"
       version_patch:
         description: "RSTUDIO_VERSION_PATCH"
-        default: "2"
+        default: "0"
       version_suffix:
         description: "RSTUDIO_VERSION_SUFFIX"
-        default: "+200"
+        default: "+174"
   push:
     tags:
       - "v*"
@@ -87,7 +87,7 @@ jobs:
             ref="$IN_REF"; major="$IN_MAJOR"; minor="$IN_MINOR"
             patch="$IN_PATCH"; suffix="$IN_SUFFIX"
           else
-            # Tag push: "v2026.08.2+200" -> ref=v2026.08.2+200, 2026 / 08 / 2 / +200
+            # Tag push: "v2026.09.0+174" -> ref=v2026.09.0+174, 2026 / 09 / 0 / +174
             ref="$TAG_NAME"
             rest="${TAG_NAME#v}"
             suffix=""
@@ -95,9 +95,9 @@ jobs:
               *+*) suffix="+${rest#*+}"; rest="${rest%%+*}" ;;
             esac
             # Reject anything that isn't exactly major.minor.patch before
-            # splitting, so e.g. "v2026.08" can't quietly yield patch=08.
+            # splitting, so e.g. "v2026.09" can't quietly yield patch=09.
             if ! printf '%s' "$rest" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "::error::Cannot parse a version out of '$TAG_NAME'. Expected a tag like v2026.08.2+200."
+              echo "::error::Cannot parse a version out of '$TAG_NAME'. Expected a tag like v2026.09.0+174."
               exit 1
             fi
             major="${rest%%.*}"; rest="${rest#*.}"
@@ -106,14 +106,14 @@ jobs:
 
           # Refuse to build (and later publish) anything we could not parse
           # into the exact fields the Makefile expects. The suffix is the
-          # upstream build number ("+200"); the Makefile turns it into the
+          # upstream build number ("+174"); the Makefile turns it into the
           # package release field, so it must be empty or +<digits>.
           if ! printf '%s' "$major.$minor.$patch" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::Version '$major.$minor.$patch' is not major.minor.patch."
             exit 1
           fi
           if [ -n "$suffix" ] && ! printf '%s' "$suffix" | grep -Eq '^\+[0-9]+$'; then
-            echo "::error::Version suffix '$suffix' is not a build number like +200."
+            echo "::error::Version suffix '$suffix' is not a build number like +174."
             exit 1
           fi
 
