@@ -5,7 +5,7 @@
 -- THIS host (it must match the host's OS/arch the tarball was built for).
 
 help([[
-RStudio Server 2026.09.0-174 -- standalone, non-root, no-systemd install.
+RStudio Server 2026.10.0-233 -- standalone, non-root, no-systemd install.
 
 Loading this module puts a `rserver-standalone` command on your PATH; it
 wraps the extracted tarball's run-standalone.sh launcher and runs a
@@ -22,26 +22,26 @@ Requires an R on $PATH (or pass --r-bin). Stop with Ctrl-C.
 ]])
 
 whatis("Name        : rstudio-server")
-whatis("Version     : 2026.09.0-174")
+whatis("Version     : 2026.10.0-233")
 whatis("Category    : development, statistics")
 whatis("Description : RStudio Server, standalone non-root/no-systemd install")
 whatis("URL         : https://github.com/rstudio/rstudio")
 
 -- Site-specific: where the …-standalone.tar.gz was extracted on this host.
 -- Matches $BASE from scripts/make-standalone.sh, e.g.
---   /opt/apps/rstudio-server/2026.09.0-174/rstudio-server-2026.09.0-174.el10.x86_64
-local prefix = "/opt/apps/rstudio-server/2026.09.0-174"
+--   /opt/apps/rstudio-server/2026.10.0-233/rstudio-server-2026.10.0-233.el10.x86_64
+local prefix = "/opt/apps/rstudio-server/2026.10.0-233"
 
 if not isDir(prefix) then
     LmodError(
-        "rstudio-server/2026.09.0-174: install prefix not found:\n    " .. prefix ..
+        "rstudio-server/2026.10.0-233: install prefix not found:\n    " .. prefix ..
         "\nExtract the standalone tarball there (tar -xzf …-standalone.tar.gz)," ..
         "\nor edit the 'prefix' variable in this modulefile."
     )
 end
 
 if not isFile(pathJoin(prefix, "run-standalone.sh")) then
-    LmodError("rstudio-server/2026.09.0-174: " .. prefix .. " does not look like an extracted standalone tarball (no run-standalone.sh).")
+    LmodError("rstudio-server/2026.10.0-233: " .. prefix .. " does not look like an extracted standalone tarball (no run-standalone.sh).")
 end
 
 setenv("RSTUDIO_PREFIX", prefix)
@@ -53,5 +53,5 @@ prepend_path("PATH", pathJoin(prefix, "bin"))
 set_alias("rserver-standalone", pathJoin(prefix, "run-standalone.sh"))
 
 if mode() == "load" then
-    LmodMessage("rstudio-server/2026.09.0-174 loaded -- run 'rserver-standalone --help' to start a session.")
+    LmodMessage("rstudio-server/2026.10.0-233 loaded -- run 'rserver-standalone --help' to start a session.")
 end
